@@ -1,0 +1,40 @@
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# API Keys
+*.key
+*.pem
+credentials.json
+
+# n8n
+.n8n/
+n8n-local.settings.json
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Node
+node_modules/
+package-lock.json
+yarn.lock
