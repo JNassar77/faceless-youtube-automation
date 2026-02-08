@@ -1,0 +1,506 @@
+{
+  "name": "YouTube Automation v1.2 - COMPLETE PRODUCTION",
+  "nodes": [
+    {
+      "id": "webhook1",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "youtube-automation",
+        "responseMode": "responseNode"
+      }
+    },
+    {
+      "id": "validation",
+      "name": "Input Validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const input = $input.first().json.body;\nconst errors = [];\n\nif (!input.topic || input.topic.length < 10 || input.topic.length > 200) {\n  errors.push({ field: \"topic\", message: \"Must be 10-200 chars\", received: input.topic });\n}\nif (input.topic && !/^[a-zA-Z0-9äöüÄÖÜß\\s\\-_,.!?]+$/.test(input.topic)) {\n  errors.push({ field: \"topic\", message: \"Contains invalid characters\", received: input.topic });\n}\n\nconst validStyles = [\"cinematic\", \"documentary\", \"educational\"];\nconst style = input.style || \"cinematic\";\nif (!validStyles.includes(style)) {\n  errors.push({ field: \"style\", message: \"Must be: \" + validStyles.join(\", \"), received: style });\n}\n\nconst duration = parseInt(input.target_duration) || 60;\nif (duration < 30 || duration > 180) {\n  errors.push({ field: \"target_duration\", message: \"Must be 30-180\", received: duration });\n}\n\nif (errors.length > 0) {\n  return { json: { valid: false, errors } };\n}\n\nreturn {\n  json: {\n    valid: true,\n    validated_data: {\n      topic: input.topic.trim(),\n      style,\n      target_duration: duration\n    },\n    execution_id: $execution.id\n  }\n};"
+      }
+    },
+    {
+      "id": "ifgate",
+      "name": "Validation Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "error400",
+      "name": "Error Response 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 480],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"error\",\n  \"message\": \"Validation failed\",\n  \"errors\": {{ $json.errors }}\n}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    },
+    {
+      "id": "claude",
+      "name": "Claude Worker",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 180],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-5-20250929\",\n  \"max_tokens\": 4096,\n  \"system\": \"{{ $env.WORKER_SYSTEM_PROMPT }}\",\n  \"messages\": [{\n    \"role\": \"user\",\n    \"content\": \"Topic: {{ $json.validated_data.topic }}\\nStyle: {{ $json.validated_data.style }}\\nTarget Duration: {{ $json.validated_data.target_duration }}s\"\n  }]\n}",
+        "options": {
+          "timeout": 60000
+        }
+      }
+    },
+    {
+      "id": "parser",
+      "name": "Claude Response Parser",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 180],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const responseText = $input.first().json.content[0].text;\nlet parsed;\n\ntry {\n  parsed = JSON.parse(responseText);\n} catch (e) {\n  const match = responseText.match(/```json?\\s*([\\s\\S]*?)```/);\n  if (match) {\n    parsed = JSON.parse(match[1]);\n  } else {\n    throw new Error(\"Claude returned invalid JSON: \" + responseText.substring(0, 200));\n  }\n}\n\nif (!parsed.script || !parsed.scenes || parsed.scenes.length === 0) {\n  throw new Error(\"Claude response missing required fields\");\n}\n\nreturn { json: parsed };"
+      }
+    },
+    {
+      "id": "elevenlabs",
+      "name": "ElevenLabs TTS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 180],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{ $env.ELEVENLABS_VOICE_ID }}/with-timestamps",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xi-api-key",
+              "value": "={{ $credentials.elevenlabsApiKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"text\": {{ $json.script | jsonStringify }},\n  \"model_id\": \"eleven_multilingual_v2\",\n  \"voice_settings\": { \"stability\": 0.6, \"similarity_boost\": 0.8 },\n  \"output_format\": \"mp3_44100_128\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "timing",
+      "name": "ElevenLabs Timing Extraction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 180],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const response = $input.first().json;\n\nconst alignment = response.alignment;\nconst audioDuration = Math.round(\n  alignment.character_end_times_seconds[\n    alignment.character_end_times_seconds.length - 1\n  ] * 100\n) / 100;\n\nconst executionId = $('Input Validation').first().json.execution_id;\n\nreturn {\n  json: {\n    audio_duration: audioDuration,\n    alignment_data: alignment,\n    execution_id: executionId\n  },\n  binary: {\n    audio: {\n      data: response.audio_base64,\n      mimeType: 'audio/mpeg',\n      fileName: executionId + '.mp3'\n    }\n  }\n};"
+      }
+    },
+    {
+      "id": "upload",
+      "name": "Supabase Audio Upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1780, 180],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/storage/v1/object/audio/{{ $json.execution_id }}.mp3",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "audio/mpeg"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "=audio",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "buildurl",
+      "name": "Build Audio URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 180],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const audioDuration = $('ElevenLabs Timing Extraction').first().json.audio_duration;\nconst executionId = $json.execution_id;\nconst supabaseUrl = $env.SUPABASE_URL;\n\nconst audioUrl = `${supabaseUrl}/storage/v1/object/public/audio/${executionId}.mp3`;\n\nreturn {\n  json: {\n    audio_url: audioUrl,\n    audio_duration: audioDuration,\n    execution_id: executionId\n  }\n};"
+      }
+    },
+    {
+      "id": "calculate",
+      "name": "Calculate Scene Durations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2220, 180],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const audioDuration = $('ElevenLabs Timing Extraction').first().json.audio_duration;\nconst scenes = $('Claude Response Parser').first().json.scenes;\n\nconst totalHintDuration = scenes.reduce((sum, s) => sum + s.duration_hint, 0);\n\nconst scenesWithDuration = scenes.map(scene => {\n  const proportionalDuration = (scene.duration_hint / totalHintDuration) * audioDuration;\n  const runwayDuration = Math.max(5, Math.min(Math.round(proportionalDuration), 10));\n  return {\n    ...scene,\n    runway_duration: runwayDuration\n  };\n});\n\nconst totalVideoDuration = scenesWithDuration.reduce((sum, s) => sum + s.runway_duration, 0);\nconst durationGap = audioDuration - totalVideoDuration;\n\nreturn {\n  json: {\n    scenes: scenesWithDuration,\n    audio_duration: audioDuration,\n    total_video_duration: totalVideoDuration,\n    duration_gap: durationGap,\n    needs_fallback: durationGap > 2\n  }\n};"
+      }
+    },
+    {
+      "id": "loop",
+      "name": "Scene Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [2440, 180],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "runway_img",
+      "name": "Runway Text to Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2660, 180],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dev.runwayml.com/v1/text_to_image",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.runwayApiKey }}"
+            },
+            {
+              "name": "X-Runway-Version",
+              "value": "2024-11-06"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"promptText\": {{ $json.visual_prompt | jsonStringify }},\n  \"ratio\": \"1920:1080\",\n  \"model\": \"gen4_image\",\n  \"seed\": {{ Math.floor(Math.random() * 4294967295) }}\n}",
+        "options": {
+          "timeout": 60000
+        }
+      }
+    },
+    {
+      "id": "poll_img",
+      "name": "Poll Image Task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2880, 180],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const taskId = $input.first().json.id;\nconst apiKey = $credentials.runwayApiKey;\n\nlet status = 'PENDING';\nlet output = null;\nlet attempts = 0;\nconst maxAttempts = 120;\n\nwhile (['PENDING', 'RUNNING'].includes(status) && attempts < maxAttempts) {\n  await new Promise(r => setTimeout(r, 5000 + Math.random() * 2000));\n  \n  const response = await fetch(`https://api.dev.runwayml.com/v1/tasks/${taskId}`, {\n    headers: {\n      'Authorization': `Bearer ${apiKey}`,\n      'X-Runway-Version': '2024-11-06'\n    }\n  });\n  \n  const task = await response.json();\n  status = task.status;\n  \n  if (status === 'SUCCEEDED') {\n    output = task.output[0];\n  }\n  \n  if (status === 'FAILED') {\n    throw new Error(`Runway image task ${taskId} failed`);\n  }\n  \n  attempts++;\n}\n\nif (!output) {\n  throw new Error(`Runway image task ${taskId} timeout after ${attempts} attempts`);\n}\n\nconst sceneData = $('Scene Loop').first().json;\n\nreturn {\n  json: {\n    ...sceneData,\n    image_url: output,\n    image_task_id: taskId\n  }\n};"
+      }
+    },
+    {
+      "id": "runway_vid",
+      "name": "Runway Image to Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [3100, 180],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dev.runwayml.com/v1/image_to_video",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.runwayApiKey }}"
+            },
+            {
+              "name": "X-Runway-Version",
+              "value": "2024-11-06"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"promptImage\": {{ $json.image_url | jsonStringify }},\n  \"model\": \"gen4_turbo\",\n  \"promptText\": {{ $json.visual_prompt | jsonStringify }},\n  \"duration\": {{ $json.runway_duration }},\n  \"ratio\": \"1280:720\"\n}",
+        "options": {
+          "timeout": 60000
+        }
+      }
+    },
+    {
+      "id": "poll_vid",
+      "name": "Poll Video Task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3320, 180],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const taskId = $input.first().json.id;\nconst apiKey = $credentials.runwayApiKey;\n\nlet status = 'PENDING';\nlet output = null;\nlet attempts = 0;\nconst maxAttempts = 240;\n\nwhile (['PENDING', 'RUNNING'].includes(status) && attempts < maxAttempts) {\n  await new Promise(r => setTimeout(r, 5000 + Math.random() * 2000));\n  \n  const response = await fetch(`https://api.dev.runwayml.com/v1/tasks/${taskId}`, {\n    headers: {\n      'Authorization': `Bearer ${apiKey}`,\n      'X-Runway-Version': '2024-11-06'\n    }\n  });\n  \n  const task = await response.json();\n  status = task.status;\n  \n  if (status === 'SUCCEEDED') {\n    output = task.output[0];\n  }\n  \n  if (status === 'FAILED') {\n    throw new Error(`Runway video task ${taskId} failed`);\n  }\n  \n  attempts++;\n}\n\nif (!output) {\n  throw new Error(`Runway video task ${taskId} timeout after ${attempts} attempts`);\n}\n\nconst previousData = $input.first().json;\n\nreturn {\n  json: {\n    ...previousData,\n    video_url: output,\n    video_task_id: taskId,\n    status: 'SUCCEEDED'\n  }\n};"
+      }
+    },
+    {
+      "id": "aggregate",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2660, 380],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const scenes = $input.all().map((item, index) => ({\n  scene_id: index + 1,\n  video_url: item.json.video_url,\n  video_task_id: item.json.video_task_id,\n  image_url: item.json.image_url,\n  image_task_id: item.json.image_task_id\n}));\n\nconst audioDuration = $('ElevenLabs Timing Extraction').first().json.audio_duration;\nconst audioUrl = $('Build Audio URL').first().json.audio_url;\nconst originalScenes = $('Calculate Scene Durations').first().json.scenes;\n\nreturn {\n  json: {\n    scenes: scenes.map((s, i) => ({\n      ...s,\n      ...originalScenes[i],\n      actual_video_duration: originalScenes[i].runway_duration\n    })),\n    audio_duration: audioDuration,\n    audio_url: audioUrl\n  }\n};"
+      }
+    },
+    {
+      "id": "build_mods",
+      "name": "Build Creatomate Modifications",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2880, 380],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const scenes = $json.scenes;\nconst audioDuration = $json.audio_duration;\nconst audioUrl = $json.audio_url;\n\nconst modifications = {\n  \"Audio-Track\": audioUrl,\n  \"Audio-Track.duration\": audioDuration\n};\n\nlet cumulativeTime = 0;\n\nscenes.forEach((scene, index) => {\n  const key = `Scene-${index + 1}`;\n  \n  modifications[`${key}.duration`] = scene.actual_video_duration;\n  modifications[`${key}.time`] = cumulativeTime;\n  modifications[`${key}-Video`] = scene.video_url;\n  \n  if (scene.text_overlay) {\n    modifications[`${key}-Text`] = scene.text_overlay;\n    modifications[`${key}-Text.time`] = cumulativeTime + (scene.overlay_timing?.start || 1);\n    modifications[`${key}-Text.duration`] = \n      (scene.overlay_timing?.end || scene.actual_video_duration - 1) - \n      (scene.overlay_timing?.start || 1);\n  }\n  \n  cumulativeTime += scene.actual_video_duration;\n});\n\nconst executionId = $('Input Validation').first().json.execution_id;\n\nreturn {\n  json: {\n    template_id: $env.CREATOMATE_TEMPLATE_ID,\n    modifications,\n    webhook_url: `${$env.N8N_WEBHOOK_BASE}/webhook/creatomate-callback`,\n    metadata: executionId\n  }\n};"
+      }
+    },
+    {
+      "id": "creatomate",
+      "name": "Creatomate Render Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [3100, 380],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.creatomate.com/v2/renders",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.creatomateApiKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 60000
+        }
+      }
+    },
+    {
+      "id": "wait",
+      "name": "Wait for Render Complete",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3320, 380],
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "maxWaitTime": 900
+        }
+      }
+    },
+    {
+      "id": "success",
+      "name": "Success Response 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [3540, 380],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"success\",\n  \"execution_id\": \"{{ $('Input Validation').first().json.execution_id }}\",\n  \"video_url\": \"{{ $json.url }}\",\n  \"audio_duration\": {{ $('ElevenLabs Timing Extraction').first().json.audio_duration }},\n  \"scenes_count\": {{ $('Aggregate Results').first().json.scenes.length }}\n}"
+      }
+    },
+    {
+      "id": "error_trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [240, 600],
+      "parameters": {}
+    },
+    {
+      "id": "error_log",
+      "name": "Log Error to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, 600],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/workflow_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"workflow_name\": \"youtube-automation\",\n  \"execution_id\": \"{{ $execution.id }}\",\n  \"event\": \"workflow_error\",\n  \"error_message\": {{ $json.error?.message | jsonStringify }},\n  \"error_node\": {{ $json.node?.name | jsonStringify }},\n  \"timestamp\": \"{{ $now }}\"\n}"
+      }
+    },
+    {
+      "id": "error500",
+      "name": "Error Response 500",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 600],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"error\",\n  \"execution_id\": \"{{ $execution.id }}\",\n  \"message\": \"Internal workflow error\"\n}",
+        "options": {
+          "responseCode": 500
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{"node": "Input Validation", "type": "main", "index": 0}]]
+    },
+    "Input Validation": {
+      "main": [[{"node": "Validation Gate", "type": "main", "index": 0}]]
+    },
+    "Validation Gate": {
+      "main": [
+        [{"node": "Claude Worker", "type": "main", "index": 0}],
+        [{"node": "Error Response 400", "type": "main", "index": 0}]
+      ]
+    },
+    "Claude Worker": {
+      "main": [[{"node": "Claude Response Parser", "type": "main", "index": 0}]]
+    },
+    "Claude Response Parser": {
+      "main": [[{"node": "ElevenLabs TTS", "type": "main", "index": 0}]]
+    },
+    "ElevenLabs TTS": {
+      "main": [[{"node": "ElevenLabs Timing Extraction", "type": "main", "index": 0}]]
+    },
+    "ElevenLabs Timing Extraction": {
+      "main": [[{"node": "Supabase Audio Upload", "type": "main", "index": 0}]]
+    },
+    "Supabase Audio Upload": {
+      "main": [[{"node": "Build Audio URL", "type": "main", "index": 0}]]
+    },
+    "Build Audio URL": {
+      "main": [[{"node": "Calculate Scene Durations", "type": "main", "index": 0}]]
+    },
+    "Calculate Scene Durations": {
+      "main": [[{"node": "Scene Loop", "type": "main", "index": 0}]]
+    },
+    "Scene Loop": {
+      "main": [
+        [{"node": "Runway Text to Image", "type": "main", "index": 0}],
+        [{"node": "Aggregate Results", "type": "main", "index": 0}]
+      ]
+    },
+    "Runway Text to Image": {
+      "main": [[{"node": "Poll Image Task", "type": "main", "index": 0}]]
+    },
+    "Poll Image Task": {
+      "main": [[{"node": "Runway Image to Video", "type": "main", "index": 0}]]
+    },
+    "Runway Image to Video": {
+      "main": [[{"node": "Poll Video Task", "type": "main", "index": 0}]]
+    },
+    "Poll Video Task": {
+      "main": [[{"node": "Scene Loop", "type": "main", "index": 0}]]
+    },
+    "Aggregate Results": {
+      "main": [[{"node": "Build Creatomate Modifications", "type": "main", "index": 0}]]
+    },
+    "Build Creatomate Modifications": {
+      "main": [[{"node": "Creatomate Render Request", "type": "main", "index": 0}]]
+    },
+    "Creatomate Render Request": {
+      "main": [[{"node": "Wait for Render Complete", "type": "main", "index": 0}]]
+    },
+    "Wait for Render Complete": {
+      "main": [[{"node": "Success Response 200", "type": "main", "index": 0}]]
+    },
+    "Error Trigger": {
+      "main": [[{"node": "Log Error to Supabase", "type": "main", "index": 0}]]
+    },
+    "Log Error to Supabase": {
+      "main": [[{"node": "Error Response 500", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "executionTimeout": 1800
+  }
+}
