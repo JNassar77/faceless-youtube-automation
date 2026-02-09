@@ -9,7 +9,7 @@
 ## 🎯 Overview
 
 Fully automated pipeline that transforms text prompts into polished, faceless YouTube videos using:
-- **Claude Sonnet 4.5** for script and visual prompt generation
+- **Claude Sonnet 4.5** for script and visual prompt generation (via n8n Langchain node)
 - **ElevenLabs** for professional text-to-speech narration
 - **Runway Gen-4 Turbo** for AI-generated video scenes
 - **Creatomate** for final video assembly and rendering
@@ -38,11 +38,15 @@ Webhook Input
     ↓
 Input Validation → Gate
     ↓ (valid)
-Claude Content Generation
+Claude Worker (Langchain Node)
     ↓
-ElevenLabs TTS → Timing Extraction → Supabase Upload
+Claude Response Parser
     ↓
-Duration Calculation
+ElevenLabs TTS (Binary File) → Timing Extraction → Supabase Upload
+    ↓
+Build Audio URL → Duration Calculation
+    ↓
+Split Out (Scene Array)
     ↓
 Scene Loop (for each scene):
     Text → Image (Runway) → Poll
@@ -51,14 +55,14 @@ Scene Loop (for each scene):
     ↓
 Aggregate Results
     ↓
-Creatomate Assembly → Wait for Render
+Build Creatomate Modifications → Creatomate Render → Wait for Render
     ↓
 Success Response (200) ✅
 
 [Error Handler → Log → Error Response (500)]
 ```
 
-**Total Nodes:** 23  
+**Total Nodes:** 25  
 **Execution Time:** 15-25 minutes  
 **Timeout:** 30 minutes
 
@@ -104,7 +108,6 @@ cp config/env.template .env
 
 # Edit .env with your values:
 # - WORKER_SYSTEM_PROMPT (from config/worker_system_prompt.txt)
-# - ELEVENLABS_VOICE_ID
 # - CREATOMATE_TEMPLATE_ID
 # - N8N_WEBHOOK_BASE
 # - SUPABASE_URL
@@ -116,11 +119,18 @@ cp config/env.template .env
 Create 4 credentials in n8n UI (Settings → Credentials):
 
 | Name | Type | Details |
-|------|------|---------|
-| `anthropicApi` | Anthropic API | API Key: `sk-ant-...` |
-| `elevenlabsApiKey` | Header Auth | Header: `xi-api-key`, Value: Your key |
-| `runwayApiKey` | Header Auth | Header: `Authorization`, Value: `Bearer YOUR_KEY` |
-| `creatomateApiKey` | Header Auth | Header: `Authorization`, Value: `Bearer YOUR_KEY` |
+|------|------|------------|
+| `Anthropic account` | Anthropic API | API Key: `sk-ant-...` |
+| `ElevenLabs account` | ElevenLabs API | API Key: Your ElevenLabs key |
+| `Runway Bearer Auth account` | HTTP Bearer Auth | Token: Your Runway API key |
+| `Creatomate Bearer Auth` | HTTP Bearer Auth | Token: Your Creatomate API key |
+| `Supabase NovaCoreDB` | Supabase API | Host: Your Supabase URL, Service Role Key |
+
+**Important Notes:**
+- The **Claude Worker** node uses the native n8n Langchain integration for Anthropic
+- **ElevenLabs** uses native n8n ElevenLabs credential (not custom header auth)
+- Voice ID `CVcPLXStXPeDxhrSflDZ` is hardcoded in the workflow (ElevenLabs TTS node)
+- Runway requires Bearer authentication with your API key
 
 6. **Activate Workflow**
 ```bash
@@ -170,8 +180,8 @@ curl -X POST https://your-n8n.com/webhook/youtube-automation \
 ## 🛠️ Tech Stack
 
 - **Workflow Engine:** n8n
-- **AI Model:** Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
-- **Text-to-Speech:** ElevenLabs API (multilingual_v2)
+- **AI Model:** Claude Sonnet 4.5 (claude-sonnet-4-5-20250929) via Langchain
+- **Text-to-Speech:** ElevenLabs API (eleven_multilingual_v2)
 - **Video Generation:** Runway Gen-4 Turbo (2-step pipeline)
 - **Video Assembly:** Creatomate
 - **Storage:** Supabase (audio files + logs)
@@ -210,11 +220,32 @@ curl -X POST https://your-n8n.com/webhook/youtube-automation \
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `WORKER_SYSTEM_PROMPT` | Claude system prompt | See config/ |
-| `ELEVENLABS_VOICE_ID` | ElevenLabs voice ID | `21m00Tcm...` |
-| `CREATOMATE_TEMPLATE_ID` | Creatomate template | `abc-123-def` |
+| `CREATOMATE_TEMPLATE_ID` | Creatomate template | `75b2838d-bbdf-42ee-86b1-507e37c85760` |
 | `N8N_WEBHOOK_BASE` | n8n instance URL | `https://n8n.example.com` |
 | `SUPABASE_URL` | Supabase project URL | `https://xxx.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service key | `eyJhbGci...` |
+
+**Note:** ElevenLabs Voice ID is hardcoded in the workflow as `CVcPLXStXPeDxhrSflDZ`. To change it, edit the "ElevenLabs TTS with Timestamps" node in n8n.
+
+---
+
+## 🔄 Key Workflow Changes in v1.2
+
+### New Nodes Added:
+1. **Split Out Node** - Properly splits scene array before loop processing
+2. **Claude Langchain Node** - Replaces HTTP Request node for better integration
+
+### Modified Nodes:
+- **ElevenLabs TTS** - Now uses binary file response (instead of with-timestamps endpoint)
+- **Timing Extraction** - Calculates audio duration from file size
+- **Poll Tasks** - Use `this.helpers.httpRequest` instead of `fetch` for better n8n compatibility
+- **Build Creatomate Modifications** - Better handling of unused scenes (sets duration to 0)
+
+### Architecture Improvements:
+- Audio duration calculation more reliable (file-size based)
+- Better error handling in polling logic
+- Cleaner scene loop management with Split Out node
+- More maintainable Runway API calls
 
 ---
 
