@@ -1,263 +1,138 @@
 # YouTube Faceless Automation - Setup Guide
 
-**Workflow ID:** `4xpZZ3ltwWU03lc6`  
-**Status:** ✅ Bereit für Deployment  
-**Total Nodes:** 23 (komplett)
+**Workflow Version:** 1.2  
+**Status:** ✅ Production Ready  
+**Total Nodes:** 25
 
 ---
 
-## 📋 ARCHITEKTUR ÜBERBLICK
+## 📋 ARCHITEKTUR
 
 ### Blocks:
-1. **Input Layer** (4 Nodes) → Webhook, Validation, Gate, Error 400
-2. **Content Generation** (2 Nodes) → Claude Worker, Parser
-3. **Audio Master** (5 Nodes) → ElevenLabs, Timing, Upload, URL, Calculate
-4. **Runway Video Pipeline** (6 Nodes) → Loop, Text→Image, Poll, Image→Video, Poll, Aggregate
-5. **Creatomate Assembly** (4 Nodes) → Modifications, Render, Wait, Success 200
-6. **Error Handling** (3 Nodes) → Trigger, Log, Error 500
+1. **Input** (4) → Webhook, Validation, Gate, Error 400
+2. **Content** (2) → Claude Langchain, Parser
+3. **Audio** (5) → ElevenLabs, Timing, Upload, URL, Calculate
+4. **Scenes** (1) → Split Out
+5. **Runway** (6) → Loop, Text→Image, Poll, Image→Video, Poll, Aggregate
+6. **Assembly** (4) → Modifications, Render, Wait, Success
+7. **Error** (3) → Trigger, Log, Error 500
 
-### Datenfluss:
+### Flow:
 ```
-POST /youtube-automation
-  → Validation → Claude → ElevenLabs → Supabase → Calculate
-    → Loop [Runway Text→Image → Poll → Image→Video → Poll] × N Scenes
-      → Aggregate → Creatomate → Wait → Success 200 ✅
+POST → Validation → Claude → ElevenLabs → Supabase → Calculate
+  → Split Out → Loop[Runway] → Aggregate → Creatomate → Success
 ```
 
 ---
 
-## ✅ DEPLOYMENT CHECKLISTE
+## ✅ SETUP
 
-### PHASE 1: SUPABASE (✅ FERTIG)
-- [x] Storage Bucket `audio` erstellt
-- [x] Tabelle `workflow_logs` erstellt
-- [x] Indexes konfiguriert
+### 1. Supabase
+- [x] Bucket `audio` erstellt
+- [x] Table `workflow_logs`
 
-### PHASE 2: N8N CREDENTIALS (❌ TODO)
+### 2. n8n Credentials
 
-**4 Credentials erstellen in:** Settings → Credentials → New
+| Type | Name | Details |
+|------|------|---------|
+| Anthropic API | Anthropic account | API Key |
+| ElevenLabs API | ElevenLabs account | API Key |
+| HTTP Bearer | Runway Bearer Auth | Token |
+| HTTP Bearer | Creatomate Bearer | Token |
+| Supabase API | Supabase NovaCoreDB | Host + Key |
 
-#### 1. Anthropic API
-```
-Type: Anthropic API
-Name: anthropicApi
-API Key: sk-ant-...
-```
-
-#### 2. ElevenLabs
-```
-Type: Header Auth
-Name: elevenlabsApiKey
-Header Name: xi-api-key
-Header Value: YOUR_KEY
-```
-
-#### 3. Runway
-```
-Type: Header Auth
-Name: runwayApiKey
-Header Name: Authorization
-Header Value: Bearer YOUR_KEY
-```
-
-#### 4. Creatomate
-```
-Type: Header Auth
-Name: creatomateApiKey
-Header Name: Authorization
-Header Value: Bearer YOUR_KEY
-```
-
-### PHASE 3: ENVIRONMENT VARIABLES (❌ TODO)
-
-**Datei:** `.env.template` → kopieren nach `.env` und ausfüllen
+### 3. Environment Variables
 
 ```bash
-# 1. WORKER SYSTEM PROMPT
-WORKER_SYSTEM_PROMPT="[Siehe worker_system_prompt.txt - als einzeilige String]"
-
-# 2. SERVICE IDs
-ELEVENLABS_VOICE_ID="21m00Tcm4TlvDq8ikWAM"  # Deine Voice ID
-CREATOMATE_TEMPLATE_ID="YOUR_TEMPLATE_ID"   # Template ID
-
-# 3. URLS
+CREATOMATE_TEMPLATE_ID="75b2838d-bbdf-42ee-86b1-507e37c85760"
 N8N_WEBHOOK_BASE="https://n8n.yourdomain.com"
-SUPABASE_URL="https://ywdwvjriklaevktswnwe.supabase.co"
-SUPABASE_SERVICE_ROLE_KEY="eyJhbGci..."
+SUPABASE_URL="https://xxx.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="eyJ..."
 ```
 
-**Wo finde ich was?**
+**Removed in v1.2:** `ELEVENLABS_VOICE_ID` (hardcoded: CVcPLXStXPeDxhrSflDZ)
 
-| Variable | Quelle |
-|----------|--------|
-| ELEVENLABS_VOICE_ID | https://elevenlabs.io/app/voice-lab → Voice → Copy ID |
-| CREATOMATE_TEMPLATE_ID | https://creatomate.com/templates → Template → Settings |
-| SUPABASE_SERVICE_ROLE_KEY | https://supabase.com/dashboard → Project → Settings → API |
+### 4. Creatomate Template
 
-### PHASE 4: CREATOMATE TEMPLATE (❌ TODO)
+Required elements:
+- Audio-Track (source, duration)
+- Scene-1 to Scene-12:
+  - Scene-X-Video (source)
+  - Scene-X-Text (optional)
+  - Scene-X (duration, time)
 
-**Template erstellen in:** https://creatomate.com/templates
-
-**Required Elements:**
-```
-Audio-Track (Audio Source)
-  └─ Modifications: url, duration
-
-Scene-1 (Composition)
-  ├─ Scene-1-Video (Video Source)
-  │   └─ Modifications: url
-  ├─ Scene-1-Text (Text Element, optional)
-  │   └─ Modifications: text, time, duration
-  └─ Modifications: duration, time
-
-Scene-2, Scene-3, ... (repeat pattern)
-```
-
-**Wichtig:**
-- Template muss dynamische Modifications unterstützen
-- Max 12 Scenes vorbereiten
-- Text Overlays optional (können null sein)
+Unused scenes: duration=0
 
 ---
 
 ## 🚀 DEPLOYMENT
 
-### 1. Workflow Aktivieren
-```
-n8n UI → Workflows → YouTube Automation v1.2 → Toggle Active
-```
-
-### 2. Webhook URL
-```
-https://your-n8n.com/webhook/youtube-automation
-```
-
-### 3. Test Request
 ```bash
-curl -X POST https://your-n8n.com/webhook/youtube-automation \
+# Test
+curl -X POST https://n8n.com/webhook/youtube-automation \
   -H "Content-Type: application/json" \
-  -d '{
-    "topic": "The Future of AI in Healthcare",
-    "style": "documentary",
-    "target_duration": 60
-  }'
+  -d '{"topic":"AI Healthcare","style":"documentary","target_duration":60}'
+
+# Timeline: 15-25min
+# Input: <1s
+# Claude: 10-30s
+# ElevenLabs: 5-15s
+# Runway: ~14min (4 scenes)
+# Creatomate: 2-5min
 ```
 
-### 4. Expected Timeline
-```
-Input Validation:       < 1s
-Claude Generation:      10-30s
-ElevenLabs TTS:         5-15s
-Supabase Upload:        2-5s
-Runway Loop (4 scenes):
-  - Text→Image:         30s × 4 = 2min
-  - Image→Video:        3min × 4 = 12min
-  Total Runway:         ~14min
-Creatomate Render:      2-5min
-──────────────────────────────
-TOTAL:                  15-25min
-```
+---
 
-### 5. Success Response
-```json
-{
-  "status": "success",
-  "execution_id": "abc-123",
-  "video_url": "https://cdn.creatomate.com/renders/...",
-  "audio_duration": 58.4,
-  "scenes_count": 4
-}
-```
+## 🆕 V1.2 CHANGES
+
+**New Nodes:**
+- Split Out (scene array)
+- Claude Langchain (replaces HTTP)
+
+**Modified:**
+- ElevenLabs: Binary file (not with-timestamps)
+- Timing: Duration from file size
+- Polls: this.helpers.httpRequest
+- Creatomate: duration=0 for unused scenes
+
+**Credentials:**
+- Native ElevenLabs API
+- Anthropic Langchain
+- Bearer Auth for Runway/Creatomate
 
 ---
 
 ## 📊 MONITORING
 
-### Check Logs in Supabase
 ```sql
 SELECT * FROM workflow_logs 
 WHERE workflow_name = 'youtube-automation'
-ORDER BY timestamp DESC
-LIMIT 20;
+ORDER BY timestamp DESC LIMIT 20;
 ```
 
-### Common Errors
-
-| Error Node | Ursache | Lösung |
-|-----------|---------|--------|
-| Claude Worker | Invalid API Key | Credential prüfen |
-| ElevenLabs TTS | Voice ID nicht gefunden | ELEVENLABS_VOICE_ID prüfen |
-| Runway Text to Image | API Limit | Warten oder Upgrade |
-| Supabase Upload | Storage Bucket fehlt | Bucket "audio" erstellen |
-| Creatomate Render | Template ID falsch | CREATOMATE_TEMPLATE_ID prüfen |
+**Common Errors:**
+- Claude: Check Anthropic credential
+- ElevenLabs: Check API key
+- Runway: API limit / timeout
+- Creatomate: Template ID wrong
 
 ---
 
-## 🔧 TROUBLESHOOTING
+## 💰 COST
 
-### Workflow startet nicht
-```bash
-# Check: Webhook ist aktiv
-curl https://your-n8n.com/webhook/youtube-automation
-
-# Expected: 405 Method Not Allowed (GET statt POST = OK)
-# Error 404 = Webhook nicht aktiv
-```
-
-### Timeout bei Runway
-```
-Poll Image Task / Poll Video Task: Max 10min / 20min
-Bei Timeout → Manuell Task Status prüfen:
-curl https://api.dev.runwayml.com/v1/tasks/{task_id} \
-  -H "Authorization: Bearer YOUR_KEY" \
-  -H "X-Runway-Version: 2024-11-06"
-```
-
-### Claude gibt kein JSON zurück
-```
-Check: WORKER_SYSTEM_PROMPT in .env korrekt escaped?
-Test: Echo $WORKER_SYSTEM_PROMPT | head -n 5
-```
+**60s video (4 scenes): ~$0.84**
+- Claude: $0.05
+- ElevenLabs: $0.03
+- Runway: $0.60 (71%)
+- Creatomate: $0.16
 
 ---
 
-## 💰 KOSTEN PRO VIDEO
+## 🎯 CHECKLIST
 
-**Basis (60s Video, 4 Scenes):**
-- Claude Sonnet 4.5: ~$0.05 (200K tokens)
-- ElevenLabs TTS: ~$0.03 (150 chars)
-- Runway Gen-4 Turbo: ~$0.60 (4 × 10s @ $0.15/s)
-- Creatomate: ~$0.16 (1 render)
-- **TOTAL: ~$0.84**
-
-**Bei Scale (100 Videos/Tag):**
-- $84/Tag = $2,520/Monat
-- Runway ist 71% der Kosten
-
----
-
-## 📁 FILES
-
-```
-/home/claude/
-  ├── worker_system_prompt.txt   # Kompletter Claude Prompt
-  └── .env.template              # Environment Variables Template
-
-n8n Workflow:
-  ID: 4xpZZ3ltwWU03lc6
-  Name: YouTube Automation v1.2 - COMPLETE PRODUCTION
-```
-
----
-
-## 🎯 NEXT STEPS
-
-1. [ ] Credentials erstellen (4×)
-2. [ ] .env konfigurieren (6 vars)
-3. [ ] Creatomate Template erstellen
-4. [ ] ElevenLabs Voice auswählen
-5. [ ] Workflow aktivieren
-6. [ ] Test Request senden
-7. [ ] Video downloaden 🎬
-
-**Viel Erfolg! 🚀**
+- [ ] 5 Credentials
+- [ ] .env configured
+- [ ] Creatomate template
+- [ ] Workflow active
+- [ ] Test request
+- [ ] Download video 🎬
