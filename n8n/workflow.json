@@ -12,7 +12,10 @@
       "name": "Webhook Trigger",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 480],
+      "position": [
+        240,
+        480
+      ],
       "webhookId": "b386ff07-8460-41e2-88df-3bd8bfbca41d"
     },
     {
@@ -23,7 +26,10 @@
       "name": "Input Validation",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [464, 480]
+      "position": [
+        464,
+        480
+      ]
     },
     {
       "parameters": {
@@ -53,7 +59,10 @@
       "name": "Validation Gate",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [688, 480]
+      "position": [
+        688,
+        480
+      ]
     },
     {
       "parameters": {
@@ -67,7 +76,10 @@
       "name": "Error Response 400",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [976, 552]
+      "position": [
+        976,
+        552
+      ]
     },
     {
       "parameters": {
@@ -77,7 +89,10 @@
       "name": "Claude Response Parser",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1264, 360]
+      "position": [
+        1264,
+        360
+      ]
     },
     {
       "parameters": {
@@ -87,7 +102,10 @@
       "name": "ElevenLabs Timing Extraction",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1712, 360]
+      "position": [
+        1712,
+        360
+      ]
     },
     {
       "parameters": {
@@ -115,7 +133,10 @@
       "name": "Supabase Audio Upload",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1936, 360],
+      "position": [
+        1936,
+        360
+      ],
       "credentials": {
         "supabaseApi": {
           "id": "f8iz392lw94fjHLf",
@@ -131,7 +152,10 @@
       "name": "Build Audio URL",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2160, 360]
+      "position": [
+        2160,
+        360
+      ]
     },
     {
       "parameters": {
@@ -141,7 +165,10 @@
       "name": "Calculate Scene Durations",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2384, 360]
+      "position": [
+        2384,
+        360
+      ]
     },
     {
       "parameters": {
@@ -151,7 +178,10 @@
       "name": "Scene Loop",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [2832, 360]
+      "position": [
+        2832,
+        360
+      ]
     },
     {
       "parameters": {
@@ -180,7 +210,10 @@
       "name": "Runway Text to Image",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [3056, 192],
+      "position": [
+        3056,
+        192
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "AvNdRYLzdHimAsuV",
@@ -194,13 +227,16 @@
     },
     {
       "parameters": {
-        "jsCode": "const taskId = $input.first().json.id;\nconst apiKey = 'key_454b9d472e9e3332f2ce2e237b8efba36871d460c9d517d0bc8dd342b13a1680b4682140d24d31648975b314460126e1d2fc5fc1b426b59b2e39f0d682d4ad4c'; // <-- Dein API Key\n\nlet status = 'PENDING';\nlet output = null;\nlet attempts = 0;\nconst maxAttempts = 120;\n\nwhile (['PENDING', 'RUNNING'].includes(status) && attempts < maxAttempts) {\n  await new Promise(r => setTimeout(r, 5000 + Math.random() * 2000));\n  \n  // GEÄNDERT: this.helpers.httpRequest statt fetch\n  const response = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `https://api.dev.runwayml.com/v1/tasks/${taskId}`,\n    headers: {\n      'Authorization': `Bearer ${apiKey}`,\n      'X-Runway-Version': '2024-11-06'\n    },\n    json: true\n  });\n  \n  status = response.status;\n  \n  if (status === 'SUCCEEDED') {\n    output = response.output[0];\n  }\n  \n  if (status === 'FAILED') {\n    throw new Error(`Runway image task ${taskId} failed`);\n  }\n  \n  attempts++;\n}\n\nif (!output) {\n  throw new Error(`Runway image task ${taskId} timeout after ${attempts} attempts`);\n}\n\nconst sceneData = $('Scene Loop').first().json;\n\nreturn {\n  json: {\n    ...sceneData,\n    image_url: output,\n    image_task_id: taskId\n  }\n};\n"
+        "jsCode": "const taskId = $input.first().json.id;\nconst apiKey = 'key_454b9d472e9e3332f2ce2e237b8efba36871d460c9d517d0bc8dd342b13a1680b4682140d24d31648975b314460126e1d2fc5fc1b426b59b2e39f0d682d4ad4c';\n\nconst terminalStatuses = ['SUCCEEDED', 'FAILED', 'CANCELLED'];\nlet status = 'PENDING';\nlet output = null;\nlet attempts = 0;\nconst maxAttempts = 80;\nconst maxPollMs = 8 * 60 * 1000;\nconst startTime = Date.now();\n\nwhile (attempts < maxAttempts) {\n  if (Date.now() - startTime > maxPollMs) {\n    throw new Error(`Runway image task ${taskId} timeout after ${(Date.now() - startTime) / 1000}s (last status: ${status})`);\n  }\n\n  const delayMs = 2500 + Math.floor(Math.random() * 1500);\n  await new Promise(r => setTimeout(r, delayMs));\n\n  const response = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `https://api.dev.runwayml.com/v1/tasks/${taskId}`,\n    headers: {\n      'Authorization': `Bearer ${apiKey}`,\n      'X-Runway-Version': '2024-11-06'\n    },\n    json: true\n  });\n\n  status = response.status;\n\n  if (status === 'SUCCEEDED') {\n    output = response.output?.[0] ?? null;\n    break;\n  }\n\n  if (status === 'FAILED' || status === 'CANCELLED') {\n    throw new Error(`Runway image task ${taskId} ended with status ${status}`);\n  }\n\n  if (!terminalStatuses.includes(status)) {\n    attempts++;\n    continue;\n  }\n\n  attempts++;\n}\n\nif (!output) {\n  throw new Error(`Runway image task ${taskId} timeout after ${attempts} attempts (last status: ${status})`);\n}\n\nconst sceneData = $('Scene Loop').first().json;\n\nreturn {\n  json: {\n    ...sceneData,\n    image_url: output,\n    image_task_id: taskId\n  }\n};"
       },
       "id": "poll_img",
       "name": "Poll Image Task",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3280, 192]
+      "position": [
+        3280,
+        192
+      ]
     },
     {
       "parameters": {
@@ -234,7 +270,10 @@
       "name": "Runway Image to Video",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [3504, 192],
+      "position": [
+        3504,
+        192
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "AvNdRYLzdHimAsuV",
@@ -248,13 +287,16 @@
     },
     {
       "parameters": {
-        "jsCode": "const taskId = $input.first().json.id;\nconst apiKey = \"key_454b9d472e9e3332f2ce2e237b8efba36871d460c9d517d0bc8dd342b13a1680b4682140d24d31648975b314460126e1d2fc5fc1b426b59b2e39f0d682d4ad4c\";\n\nlet status = 'PENDING';\nlet output = null;\nlet attempts = 0;\nconst maxAttempts = 240;\n\nwhile (['PENDING', 'RUNNING'].includes(status) && attempts < maxAttempts) {\n  await new Promise(r => setTimeout(r, 5000 + Math.random() * 2000));\n  \n  // GEÄNDERT: this.helpers.httpRequest statt fetch\n  const task = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `https://api.dev.runwayml.com/v1/tasks/${taskId}`,\n    headers: {\n      'Authorization': `Bearer ${apiKey}`,\n      'X-Runway-Version': '2024-11-06'\n    },\n    json: true\n  });\n  \n  status = task.status;\n  \n  if (status === 'SUCCEEDED') {\n    output = task.output[0];\n  }\n  \n  if (status === 'FAILED') {\n    throw new Error(`Runway video task ${taskId} failed`);\n  }\n  \n  attempts++;\n}\n\nif (!output) {\n  throw new Error(`Runway video task ${taskId} timeout after ${attempts} attempts`);\n}\n\nconst previousData = $input.first().json;\n\nreturn {\n  json: {\n    ...previousData,\n    video_url: output,\n    video_task_id: taskId,\n    status: 'SUCCEEDED'\n  }\n};"
+        "jsCode": "const taskId = $input.first().json.id;\nconst apiKey = \"key_454b9d472e9e3332f2ce2e237b8efba36871d460c9d517d0bc8dd342b13a1680b4682140d24d31648975b314460126e1d2fc5fc1b426b59b2e39f0d682d4ad4c\";\n\nconst terminalStatuses = ['SUCCEEDED', 'FAILED', 'CANCELLED'];\nlet status = 'PENDING';\nlet output = null;\nlet attempts = 0;\nconst maxAttempts = 160;\nconst maxPollMs = 14 * 60 * 1000;\nconst startTime = Date.now();\n\nwhile (attempts < maxAttempts) {\n  if (Date.now() - startTime > maxPollMs) {\n    throw new Error(`Runway video task ${taskId} timeout after ${(Date.now() - startTime) / 1000}s (last status: ${status})`);\n  }\n\n  const delayMs = 3000 + Math.floor(Math.random() * 2000);\n  await new Promise(r => setTimeout(r, delayMs));\n\n  const task = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `https://api.dev.runwayml.com/v1/tasks/${taskId}`,\n    headers: {\n      'Authorization': `Bearer ${apiKey}`,\n      'X-Runway-Version': '2024-11-06'\n    },\n    json: true\n  });\n\n  status = task.status;\n\n  if (status === 'SUCCEEDED') {\n    output = task.output?.[0] ?? null;\n    break;\n  }\n\n  if (status === 'FAILED' || status === 'CANCELLED') {\n    throw new Error(`Runway video task ${taskId} ended with status ${status}`);\n  }\n\n  attempts++;\n}\n\nif (!output) {\n  throw new Error(`Runway video task ${taskId} timeout after ${attempts} attempts (last status: ${status})`);\n}\n\nconst previousData = $input.first().json;\n\nreturn {\n  json: {\n    ...previousData,\n    video_url: output,\n    video_task_id: taskId,\n    status: 'SUCCEEDED'\n  }\n};"
       },
       "id": "poll_vid",
       "name": "Poll Video Task",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3728, 288]
+      "position": [
+        3728,
+        288
+      ]
     },
     {
       "parameters": {
@@ -264,7 +306,10 @@
       "name": "Aggregate Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3056, 384]
+      "position": [
+        3056,
+        384
+      ]
     },
     {
       "parameters": {
@@ -274,7 +319,10 @@
       "name": "Build Creatomate Modifications",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3280, 384]
+      "position": [
+        3280,
+        384
+      ]
     },
     {
       "parameters": {
@@ -293,7 +341,10 @@
       "name": "Creatomate Render Request",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [3504, 384],
+      "position": [
+        3504,
+        384
+      ],
       "credentials": {
         "httpBearerAuth": {
           "id": "2w0pNEi74U6ztfC8",
@@ -310,7 +361,10 @@
       "name": "Wait for Render Complete",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [3728, 480],
+      "position": [
+        3728,
+        480
+      ],
       "webhookId": "362a5508-d8eb-4c23-88f8-741cdbf0996f"
     },
     {
@@ -323,7 +377,10 @@
       "name": "Success Response 200",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [3952, 480]
+      "position": [
+        3952,
+        480
+      ]
     },
     {
       "parameters": {},
@@ -331,7 +388,10 @@
       "name": "Error Trigger",
       "type": "n8n-nodes-base.errorTrigger",
       "typeVersion": 1,
-      "position": [240, 776]
+      "position": [
+        240,
+        776
+      ]
     },
     {
       "parameters": {
@@ -370,7 +430,10 @@
       "name": "Log Error to Supabase",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [464, 776]
+      "position": [
+        464,
+        776
+      ]
     },
     {
       "parameters": {
@@ -384,7 +447,10 @@
       "name": "Error Response 500",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [688, 776]
+      "position": [
+        688,
+        776
+      ]
     },
     {
       "parameters": {
@@ -408,7 +474,10 @@
       },
       "type": "@n8n/n8n-nodes-langchain.anthropic",
       "typeVersion": 1,
-      "position": [912, 360],
+      "position": [
+        912,
+        360
+      ],
       "id": "b1c793e0-50d8-42c5-9918-11457bf18ddd",
       "name": "Claude worker",
       "credentials": {
@@ -438,7 +507,10 @@
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
-      "position": [1488, 360],
+      "position": [
+        1488,
+        360
+      ],
       "id": "c81f5336-1ce1-4904-9d77-2a1fb621ccbd",
       "name": "ElevenLabs TTS with Timestamps",
       "credentials": {
@@ -460,7 +532,10 @@
       },
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [2608, 360],
+      "position": [
+        2608,
+        360
+      ],
       "id": "afc71c15-ccaa-4dbf-95d7-23c3c9f92fb3",
       "name": "Split Out"
     }
