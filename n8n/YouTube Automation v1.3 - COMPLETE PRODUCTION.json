@@ -1,5 +1,4 @@
 {
-  "name": "YouTube Automation v1.3 - COMPLETE PRODUCTION",
   "nodes": [
     {
       "parameters": {
@@ -8,13 +7,13 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "webhook1",
+      "id": "3d9e32a0-8a10-4122-bccc-4a64647683c8",
       "name": "Webhook Trigger",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        240,
-        480
+        -4128,
+        -256
       ],
       "webhookId": "b386ff07-8460-41e2-88df-3bd8bfbca41d"
     },
@@ -22,13 +21,13 @@
       "parameters": {
         "jsCode": "const input = $input.first().json.body;\nconst errors = [];\n\nif (!input.topic || input.topic.length < 10 || input.topic.length > 200) {\n  errors.push({ field: \"topic\", message: \"Must be 10-200 chars\", received: input.topic });\n}\nif (input.topic && !/^[a-zA-Z0-9äöüÄÖÜß\\s\\-_,.!?]+$/.test(input.topic)) {\n  errors.push({ field: \"topic\", message: \"Contains invalid characters\", received: input.topic });\n}\n\nconst validStyles = [\"cinematic\", \"documentary\", \"educational\"];\nconst style = input.style || \"cinematic\";\nif (!validStyles.includes(style)) {\n  errors.push({ field: \"style\", message: \"Must be: \" + validStyles.join(\", \"), received: style });\n}\n\nconst duration = parseInt(input.target_duration) || 60;\nif (duration < 30 || duration > 180) {\n  errors.push({ field: \"target_duration\", message: \"Must be 30-180\", received: duration });\n}\n\nif (errors.length > 0) {\n  return { json: { valid: false, errors } };\n}\n\nreturn {\n  json: {\n    valid: true,\n    validated_data: {\n      topic: input.topic.trim(),\n      style,\n      target_duration: duration\n    },\n    execution_id: $execution.id\n  }\n};"
       },
-      "id": "validation",
+      "id": "ced13306-01db-418b-8b42-cdd6356aa997",
       "name": "Input Validation",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        464,
-        480
+        -3904,
+        -256
       ]
     },
     {
@@ -55,13 +54,13 @@
         },
         "options": {}
       },
-      "id": "ifgate",
+      "id": "10f177dc-515f-44e6-808a-534218a5015f",
       "name": "Validation Gate",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        688,
-        480
+        -3680,
+        -256
       ]
     },
     {
@@ -72,39 +71,39 @@
           "responseCode": 400
         }
       },
-      "id": "error400",
+      "id": "660d8533-a0f1-4ea2-8757-343bb92278c8",
       "name": "Error Response 400",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        976,
-        552
+        -3392,
+        -176
       ]
     },
     {
       "parameters": {
         "jsCode": "const responseText = $input.first().json.content[0].text;\nlet parsed;\n\ntry {\n  parsed = JSON.parse(responseText);\n} catch (e) {\n  const match = responseText.match(/```json?\\s*([\\s\\S]*?)```/);\n  if (match) {\n    parsed = JSON.parse(match[1]);\n  } else {\n    throw new Error(\"Claude returned invalid JSON: \" + responseText.substring(0, 200));\n  }\n}\n\nif (!parsed.script || !parsed.scenes || parsed.scenes.length === 0) {\n  throw new Error(\"Claude response missing required fields\");\n}\n\nreturn { json: parsed };"
       },
-      "id": "parser",
+      "id": "207d5935-2ab9-4b2a-8dff-1d848c096e17",
       "name": "Claude Response Parser",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1264,
-        360
+        -3104,
+        -368
       ]
     },
     {
       "parameters": {
         "jsCode": "const input = $input.first();\nconst binaryData = input.binary?.data;\n\nif (!binaryData) {\n  throw new Error('No audio data found');\n}\n\nfunction parseFileSizeToBytes(fileSize) {\n  if (typeof fileSize === 'number') return fileSize;\n  if (typeof fileSize !== 'string') return 0;\n\n  const normalized = fileSize.trim().replace(',', '.');\n  const match = normalized.match(/(\\d+\\.?\\d*)\\s*(B|KB|MB|GB)?/i);\n  if (!match) return 0;\n\n  const value = parseFloat(match[1]);\n  const unit = (match[2] || 'B').toUpperCase();\n  const multipliers = { B: 1, KB: 1024, MB: 1024 ** 2, GB: 1024 ** 3 };\n  return value * (multipliers[unit] || 1);\n}\n\nfunction estimateBitrateFromMp3Header(buffer) {\n  if (!buffer || buffer.length < 4) return null;\n\n  let offset = 0;\n  if (buffer.slice(0, 3).toString('ascii') === 'ID3' && buffer.length > 10) {\n    const size = ((buffer[6] & 0x7f) << 21) | ((buffer[7] & 0x7f) << 14) | ((buffer[8] & 0x7f) << 7) | (buffer[9] & 0x7f);\n    offset = 10 + size;\n  }\n\n  const bitratesMpeg1L3 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];\n  const bitratesMpeg2L3 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0];\n\n  for (let i = offset; i < buffer.length - 4; i++) {\n    const b1 = buffer[i];\n    const b2 = buffer[i + 1];\n    if (b1 !== 0xff || (b2 & 0xe0) !== 0xe0) continue;\n\n    const versionBits = (b2 >> 3) & 0x03;\n    const layerBits = (b2 >> 1) & 0x03;\n    if (layerBits !== 0x01) continue;\n\n    const b3 = buffer[i + 2];\n    const bitrateIndex = (b3 >> 4) & 0x0f;\n\n    if (versionBits === 0x03) return bitratesMpeg1L3[bitrateIndex] || null;\n    if (versionBits === 0x02 || versionBits === 0x00) return bitratesMpeg2L3[bitrateIndex] || null;\n  }\n\n  return null;\n}\n\nlet audioBytes = parseFileSizeToBytes(binaryData.fileSize);\nlet buffer = null;\n\nif (typeof binaryData.data === 'string') {\n  try {\n    buffer = Buffer.from(binaryData.data, 'base64');\n    if (!audioBytes) audioBytes = buffer.length;\n  } catch (error) {\n    console.log('Could not decode base64 audio buffer:', error.message);\n  }\n}\n\nif (!audioBytes || audioBytes <= 0) {\n  throw new Error('Could not determine audio size for duration estimation');\n}\n\nconst bitrateKbps = estimateBitrateFromMp3Header(buffer) || 128;\nconst estimatedDuration = audioBytes / ((bitrateKbps * 1000) / 8);\n\nconst executionId = $('Input Validation').first().json.execution_id;\n\nreturn {\n  json: {\n    audio_duration: Math.round(estimatedDuration * 10) / 10,\n    alignment: null,\n    normalized_alignment: null,\n    timing_mode: 'estimated_from_size_and_header',\n    execution_id: executionId\n  },\n  binary: {\n    audio: binaryData\n  }\n};"
       },
-      "id": "timing",
+      "id": "804e40ca-e046-4ae0-9d1b-8d22f35cbd43",
       "name": "ElevenLabs Timing Extraction",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1712,
-        360
+        -2656,
+        -368
       ]
     },
     {
@@ -129,13 +128,13 @@
           "timeout": 30000
         }
       },
-      "id": "upload",
+      "id": "e43da654-cc5d-4fb9-88aa-9c2782783298",
       "name": "Supabase Audio Upload",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        1936,
-        360
+        -2432,
+        -368
       ],
       "credentials": {
         "supabaseApi": {
@@ -148,39 +147,39 @@
       "parameters": {
         "jsCode": "// Audio Duration vom ElevenLabs Node holen\nconst audioDuration = $('ElevenLabs Timing Extraction').first().json.audio_duration;\n\n// execution_id vom Supabase Upload Node holen\nconst executionId = $json.execution_id;\n\n// Falls execution_id undefined ist, vom ElevenLabs Node holen\nconst finalExecutionId = executionId || $('ElevenLabs Timing Extraction').first().json.execution_id;\n\n// Muss exakt mit der Upload-Domain übereinstimmen\nconst supabaseUrl = 'https://ywdwvjriklaevktswnwe.supabase.co';\n\nconst audioUrl = `${supabaseUrl}/storage/v1/object/public/audio/${finalExecutionId}.mp3`;\n\nconsole.log('Audio Duration:', audioDuration);\nconsole.log('Execution ID:', finalExecutionId);\nconsole.log('Audio URL:', audioUrl);\n\nreturn {\n  json: {\n    audio_url: audioUrl,\n    audio_duration: audioDuration,\n    execution_id: finalExecutionId\n  }\n};"
       },
-      "id": "buildurl",
+      "id": "8214ed52-fe3f-4523-ab75-0a1e26266edb",
       "name": "Build Audio URL",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2160,
-        360
+        -2208,
+        -368
       ]
     },
     {
       "parameters": {
         "jsCode": "const audioDuration = $('ElevenLabs Timing Extraction').first().json.audio_duration;\nconst scenes = $('Claude Response Parser').first().json.scenes;\n\nconst totalHintDuration = scenes.reduce((sum, s) => sum + s.duration_hint, 0);\n\nconst scenesWithDuration = scenes.map(scene => {\n  const proportionalDuration = (scene.duration_hint / totalHintDuration) * audioDuration;\n  const runwayDuration = Math.max(5, Math.min(Math.round(proportionalDuration), 10));\n  return {\n    ...scene,\n    runway_duration: runwayDuration\n  };\n});\n\nconst totalVideoDuration = scenesWithDuration.reduce((sum, s) => sum + s.runway_duration, 0);\nconst durationGap = audioDuration - totalVideoDuration;\n\nreturn {\n  json: {\n    scenes: scenesWithDuration,\n    audio_duration: audioDuration,\n    total_video_duration: totalVideoDuration,\n    duration_gap: durationGap,\n    needs_fallback: durationGap > 2\n  }\n};"
       },
-      "id": "calculate",
+      "id": "0fc120c1-a30d-48a1-9e96-ec42ad16aa7c",
       "name": "Calculate Scene Durations",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2384,
-        360
+        -1984,
+        -368
       ]
     },
     {
       "parameters": {
         "options": {}
       },
-      "id": "loop",
+      "id": "da5b380f-5f01-4fdb-b116-dcf1f151359d",
       "name": "Scene Loop",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        2832,
-        360
+        -1536,
+        -368
       ]
     },
     {
@@ -201,18 +200,18 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={\n  \"promptText\": \"{{ $json.scenes.visual_prompt }}\",\n  \"ratio\": \"1920:1080\",\n  \"model\": \"gen4_image\",\n  \"seed\": {{ Math.floor(Math.random() * 4294967295) }}\n}",
+        "body": "={\n  \"promptText\": \"{{ $json.scenes.visual_prompt }}\",\n  \"ratio\": \"1280:720\",\n  \"model\": \"gen4_image\",\n  \"seed\": {{ Math.floor(Math.random() * 4294967295) }}\n}",
         "options": {
           "timeout": 60000
         }
       },
-      "id": "runway_img",
+      "id": "9ca8c3f6-d3bb-489a-9f6d-a78c06080e0e",
       "name": "Runway Text to Image",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        3056,
-        192
+        -1312,
+        -544
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -229,13 +228,13 @@
       "parameters": {
         "jsCode": "const taskId = $input.first().json.id;\nconst apiKey = 'key_454b9d472e9e3332f2ce2e237b8efba36871d460c9d517d0bc8dd342b13a1680b4682140d24d31648975b314460126e1d2fc5fc1b426b59b2e39f0d682d4ad4c'; // bewusst nicht geändert\n\nlet status = 'PENDING';\nlet output = null;\nlet attempts = 0;\nconst maxAttempts = 80;\nconst maxPollMs = 8 * 60 * 1000;\nconst startTime = Date.now();\n\nwhile (['PENDING', 'RUNNING'].includes(status) && attempts < maxAttempts) {\n  if (Date.now() - startTime > maxPollMs) {\n    throw new Error(`Runway image task ${taskId} timeout after ${(Date.now() - startTime) / 1000}s`);\n  }\n\n  const delayMs = 2500 + Math.floor(Math.random() * 1500);\n  await new Promise(r => setTimeout(r, delayMs));\n\n  const response = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `https://api.dev.runwayml.com/v1/tasks/${taskId}`,\n    headers: {\n      'Authorization': `Bearer ${apiKey}`,\n      'X-Runway-Version': '2024-11-06'\n    },\n    json: true\n  });\n\n  status = response.status;\n\n  if (status === 'SUCCEEDED') {\n    output = response.output[0];\n    break;\n  }\n\n  if (status === 'FAILED' || status === 'CANCELLED') {\n    throw new Error(`Runway image task ${taskId} ended with status ${status}`);\n  }\n\n  attempts++;\n}\n\nif (!output) {\n  throw new Error(`Runway image task ${taskId} timeout after ${attempts} attempts`);\n}\n\nconst sceneData = $('Scene Loop').first().json;\n\nreturn {\n  json: {\n    ...sceneData,\n    image_url: output,\n    image_task_id: taskId\n  }\n};\n"
       },
-      "id": "poll_img",
+      "id": "18371572-4d68-4e96-8585-243edc1312d4",
       "name": "Poll Image Task",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3280,
-        192
+        -1088,
+        -544
       ]
     },
     {
@@ -266,13 +265,13 @@
           "timeout": 60000
         }
       },
-      "id": "runway_vid",
+      "id": "d13414dd-aeab-4b8c-a4f8-b19e9102d9cd",
       "name": "Runway Image to Video",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        3504,
-        192
+        -864,
+        -544
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -289,39 +288,39 @@
       "parameters": {
         "jsCode": "const taskId = $input.first().json.id;\nconst apiKey = \"key_454b9d472e9e3332f2ce2e237b8efba36871d460c9d517d0bc8dd342b13a1680b4682140d24d31648975b314460126e1d2fc5fc1b426b59b2e39f0d682d4ad4c\";\n\nlet status = 'PENDING';\nlet output = null;\nlet attempts = 0;\nconst maxAttempts = 160;\nconst maxPollMs = 14 * 60 * 1000;\nconst startTime = Date.now();\n\nwhile (['PENDING', 'RUNNING'].includes(status) && attempts < maxAttempts) {\n  if (Date.now() - startTime > maxPollMs) {\n    throw new Error(`Runway video task ${taskId} timeout after ${(Date.now() - startTime) / 1000}s`);\n  }\n\n  const delayMs = 3000 + Math.floor(Math.random() * 2000);\n  await new Promise(r => setTimeout(r, delayMs));\n\n  const task = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `https://api.dev.runwayml.com/v1/tasks/${taskId}`,\n    headers: {\n      'Authorization': `Bearer ${apiKey}`,\n      'X-Runway-Version': '2024-11-06'\n    },\n    json: true\n  });\n\n  status = task.status;\n\n  if (status === 'SUCCEEDED') {\n    output = task.output[0];\n    break;\n  }\n\n  if (status === 'FAILED' || status === 'CANCELLED') {\n    throw new Error(`Runway video task ${taskId} ended with status ${status}`);\n  }\n\n  attempts++;\n}\n\nif (!output) {\n  throw new Error(`Runway video task ${taskId} timeout after ${attempts} attempts`);\n}\n\nconst previousData = $input.first().json;\n\nreturn {\n  json: {\n    ...previousData,\n    video_url: output,\n    video_task_id: taskId,\n    status: 'SUCCEEDED'\n  }\n};"
       },
-      "id": "poll_vid",
+      "id": "ee1126c2-8a59-4028-9035-e85f5593902f",
       "name": "Poll Video Task",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3728,
-        288
+        -640,
+        -448
       ]
     },
     {
       "parameters": {
         "jsCode": "const scenes = $input.all().map((item, index) => ({\n  scene_id: index + 1,\n  video_url: item.json.video_url,\n  video_task_id: item.json.video_task_id,\n  image_url: item.json.image_url,\n  image_task_id: item.json.image_task_id\n}));\n\nconst audioDuration = $('ElevenLabs Timing Extraction').first().json.audio_duration;\nconst audioUrl = $('Build Audio URL').first().json.audio_url;\nconst originalScenes = $('Calculate Scene Durations').first().json.scenes;\n\nreturn {\n  json: {\n    scenes: scenes.map((s, i) => ({\n      ...s,\n      ...originalScenes[i],\n      actual_video_duration: originalScenes[i].runway_duration\n    })),\n    audio_duration: audioDuration,\n    audio_url: audioUrl\n  }\n};"
       },
-      "id": "aggregate",
+      "id": "e597a818-17b2-4c9f-83d8-3bed35c14525",
       "name": "Aggregate Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3056,
-        384
+        -1312,
+        -352
       ]
     },
     {
       "parameters": {
         "jsCode": "const scenes = $json.scenes;\nconst audioDuration = $json.audio_duration;\nconst audioUrl = $json.audio_url;\n\nconst modifications = {\n  \"Audio-Track\": audioUrl,\n  \"Audio-Track.duration\": audioDuration\n};\n\nlet cumulativeTime = 0;\n\n// GENUTZTE SCENES (mit Runway-Videos füllen)\nscenes.forEach((scene, index) => {\n  const sceneNum = index + 1;\n  \n  // Video-URL von Runway einfügen\n  modifications[`Scene-${sceneNum}-Video.source`] = scene.video_url;\n  \n  // Scene-Timing setzen\n  modifications[`Scene-${sceneNum}.duration`] = scene.actual_video_duration;\n  modifications[`Scene-${sceneNum}.time`] = cumulativeTime;\n  \n  // Text-Overlay (falls vorhanden)\n  if (scene.text_overlay) {\n    modifications[`Scene-${sceneNum}-Text.text`] = scene.text_overlay;\n    modifications[`Scene-${sceneNum}-Text.time`] = cumulativeTime + (scene.overlay_timing?.start || 1);\n    modifications[`Scene-${sceneNum}-Text.duration`] = \n      (scene.overlay_timing?.end || scene.actual_video_duration - 1) - \n      (scene.overlay_timing?.start || 1);\n  } else {\n    modifications[`Scene-${sceneNum}-Text.text`] = \"\";\n  }\n  \n  cumulativeTime += scene.actual_video_duration;\n});\n\n// UNGENUTZTE SCENES (ausblenden durch duration = 0)\nconst totalScenes = 12; // Dein Template hat 12 Scenes\nconst usedScenes = scenes.length;\n\nfor (let i = usedScenes + 1; i <= totalScenes; i++) {\n  modifications[`Scene-${i}.duration`] = 0;  // Duration auf 0 = unsichtbar\n  modifications[`Scene-${i}-Video.source`] = \"\";  // Leere Video-URL\n  modifications[`Scene-${i}-Text.text`] = \"\";  // Leerer Text\n}\n\nconst executionId = $('Input Validation').first().json.execution_id;\n\nreturn {\n  json: {\n    template_id: \"75b2838d-bbdf-42ee-86b1-507e37c85760\",\n    modifications: modifications\n  }\n};"
       },
-      "id": "build_mods",
+      "id": "dd0b97c0-dc6e-4353-b2d4-571bc544e4e9",
       "name": "Build Creatomate Modifications",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3280,
-        384
+        -1088,
+        -352
       ]
     },
     {
@@ -332,18 +331,18 @@
         "genericAuthType": "httpBearerAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ $json }}",
+        "jsonBody": "={{ {\n  ...$json,\n  webhook_url: $execution.resumeUrl,\n  metadata: { execution_id: $('Input Validation').first().json.execution_id }\n} }}",
         "options": {
           "timeout": 60000
         }
       },
-      "id": "creatomate",
+      "id": "ff499040-17fe-446f-a627-65117f25fa42",
       "name": "Creatomate Render Request",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        3504,
-        384
+        -864,
+        -352
       ],
       "credentials": {
         "httpBearerAuth": {
@@ -355,15 +354,16 @@
     {
       "parameters": {
         "resume": "webhook",
+        "httpMethod": "POST",
         "options": {}
       },
-      "id": "wait",
+      "id": "91e58e7e-f335-4d63-9e3b-2851a0bc83fe",
       "name": "Wait for Render Complete",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        3728,
-        480
+        -640,
+        -256
       ],
       "webhookId": "362a5508-d8eb-4c23-88f8-741cdbf0996f"
     },
@@ -373,24 +373,24 @@
         "responseBody": "={\n  \"status\": \"success\",\n  \"execution_id\": \"{{ $('Input Validation').first().json.execution_id }}\",\n  \"video_url\": \"{{ $json.url }}\",\n  \"audio_duration\": {{ $('ElevenLabs Timing Extraction').first().json.audio_duration }},\n  \"scenes_count\": {{ $('Aggregate Results').first().json.scenes.length }}\n}",
         "options": {}
       },
-      "id": "success",
+      "id": "0337f36a-a88f-425b-9ad2-0d98d954d797",
       "name": "Success Response 200",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        3952,
-        480
+        -416,
+        -256
       ]
     },
     {
       "parameters": {},
-      "id": "error_trigger",
+      "id": "545da927-d8fe-43ea-9a89-4495d48d8c8f",
       "name": "Error Trigger",
       "type": "n8n-nodes-base.errorTrigger",
       "typeVersion": 1,
       "position": [
-        240,
-        776
+        -4128,
+        48
       ]
     },
     {
@@ -426,13 +426,13 @@
         },
         "options": {}
       },
-      "id": "log_error",
+      "id": "5f3b077a-7a9d-4196-8d7b-6d16c156c42f",
       "name": "Log Error to Supabase",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
       "position": [
-        464,
-        776
+        -3904,
+        48
       ]
     },
     {
@@ -443,13 +443,13 @@
           "responseCode": 500
         }
       },
-      "id": "error500",
+      "id": "d427e3da-5737-4ab3-a6f8-aba0b09073d3",
       "name": "Error Response 500",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        688,
-        776
+        -3680,
+        48
       ]
     },
     {
@@ -475,10 +475,10 @@
       "type": "@n8n/n8n-nodes-langchain.anthropic",
       "typeVersion": 1,
       "position": [
-        912,
-        360
+        -3456,
+        -368
       ],
-      "id": "b1c793e0-50d8-42c5-9918-11457bf18ddd",
+      "id": "970bbcd1-7bcd-4c97-bc59-f700601f2be5",
       "name": "Claude worker",
       "credentials": {
         "anthropicApi": {
@@ -508,10 +508,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1488,
-        360
+        -2880,
+        -368
       ],
-      "id": "c81f5336-1ce1-4904-9d77-2a1fb621ccbd",
+      "id": "d9c89218-a25b-4c42-ad99-6ccb7494b093",
       "name": "ElevenLabs TTS with Timestamps",
       "credentials": {
         "httpBearerAuth": {
@@ -533,11 +533,65 @@
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
       "position": [
-        2608,
-        360
+        -1760,
+        -368
       ],
-      "id": "afc71c15-ccaa-4dbf-95d7-23c3c9f92fb3",
+      "id": "2a7954b3-4205-494b-8632-8258b89d96e3",
       "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "video"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -208,
+        -256
+      ],
+      "id": "f77e61d4-66b5-43d5-a9ef-bd90d1dcfb2b",
+      "name": "Download Creatomate Video"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "video",
+        "name": "={{ $('Input Validation').first().json.execution_id }}.mp4",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1RNAnPnNXyYbpQj8IJYdVQ5rC6_Bo4bFd",
+          "mode": "list",
+          "cachedResultName": "Video Automation",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1RNAnPnNXyYbpQj8IJYdVQ5rC6_Bo4bFd"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        0,
+        -256
+      ],
+      "id": "b2ceacb9-c796-42ec-901c-681120f337d2",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "wyNBHfRkeutrmSys",
+          "name": "Google Drive account"
+        }
+      }
     }
   ],
   "connections": {
@@ -742,6 +796,17 @@
         ]
       ]
     },
+    "Success Response 200": {
+      "main": [
+        [
+          {
+            "node": "Download Creatomate Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Error Trigger": {
       "main": [
         [
@@ -796,22 +861,22 @@
           }
         ]
       ]
+    },
+    "Download Creatomate Video": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": {
-    "executionOrder": "v1",
-    "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "all",
-    "saveManualExecutions": true,
-    "saveExecutionProgress": true,
-    "executionTimeout": 1800,
-    "callerPolicy": "workflowsFromSameOwner",
-    "availableInMCP": false
-  },
-  "staticData": null,
-  "tags": [],
   "pinData": {},
   "meta": {
-    "templateCredsSetupCompleted": true
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c4b20595f230d613d9fcce7c853b7a7e3b4da29f9372a38cfd904a8214fcd864"
   }
 }
