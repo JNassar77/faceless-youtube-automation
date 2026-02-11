@@ -100,6 +100,10 @@
       },
       "id": "timing",
       "name": "Estimated Audio Timing",
+        "jsCode": "const input = $input.first();\nconst binaryData = input.binary?.data;\n\nif (!binaryData) {\n  throw new Error('No audio data found');\n}\n\nfunction parseFileSizeToBytes(fileSize) {\n  if (typeof fileSize === 'number') return fileSize;\n  if (typeof fileSize !== 'string') return 0;\n\n  const normalized = fileSize.trim().replace(',', '.');\n  const match = normalized.match(/(\\d+\\.?\\d*)\\s*(B|KB|MB|GB)?/i);\n  if (!match) return 0;\n\n  const value = parseFloat(match[1]);\n  const unit = (match[2] || 'B').toUpperCase();\n  const multipliers = { B: 1, KB: 1024, MB: 1024 ** 2, GB: 1024 ** 3 };\n  return value * (multipliers[unit] || 1);\n}\n\nfunction estimateBitrateFromMp3Header(buffer) {\n  if (!buffer || buffer.length < 4) return null;\n\n  // ID3-Tag überspringen\n  let offset = 0;\n  if (buffer.slice(0, 3).toString('ascii') === 'ID3' && buffer.length > 10) {\n    const size = ((buffer[6] & 0x7f) << 21) | ((buffer[7] & 0x7f) << 14) | ((buffer[8] & 0x7f) << 7) | (buffer[9] & 0x7f);\n    offset = 10 + size;\n  }\n\n  const bitratesMpeg1L3 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];\n  const bitratesMpeg2L3 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0];\n\n  for (let i = offset; i < buffer.length - 4; i++) {\n    const b1 = buffer[i];\n    const b2 = buffer[i + 1];\n    if (b1 !== 0xff || (b2 & 0xe0) !== 0xe0) continue;\n\n    const versionBits = (b2 >> 3) & 0x03;\n    const layerBits = (b2 >> 1) & 0x03;\n    if (layerBits !== 0x01) continue; // nur Layer III\n\n    const b3 = buffer[i + 2];\n    const bitrateIndex = (b3 >> 4) & 0x0f;\n\n    if (versionBits === 0x03) {\n      return bitratesMpeg1L3[bitrateIndex] || null;\n    }\n    if (versionBits === 0x02 || versionBits === 0x00) {\n      return bitratesMpeg2L3[bitrateIndex] || null;\n    }\n  }\n\n  return null;\n}\n\nlet audioBytes = parseFileSizeToBytes(binaryData.fileSize);\nlet buffer = null;\n\nif (binaryData.data && typeof binaryData.data === 'string') {\n  try {\n    buffer = Buffer.from(binaryData.data, 'base64');\n    if (!audioBytes) audioBytes = buffer.length;\n  } catch (error) {\n    console.log('Could not decode base64 audio buffer:', error.message);\n  }\n}\n\nif (!audioBytes || audioBytes <= 0) {\n  throw new Error('Could not determine audio size for duration estimation');\n}\n\nconst bitrateKbps = estimateBitrateFromMp3Header(buffer) || 128;\nconst estimatedDuration = audioBytes / ((bitrateKbps * 1000) / 8);\n\nconsole.log('Audio Bytes:', audioBytes);\nconsole.log('Detected Bitrate (kbps):', bitrateKbps);\nconsole.log('Estimated Duration (seconds):', estimatedDuration);\n\nconst executionId = $('Input Validation').first().json.execution_id;\n\nreturn {\n  json: {\n    audio_duration: Math.round(estimatedDuration * 10) / 10,\n    alignment: null,\n    normalized_alignment: null,\n    execution_id: executionId\n  },\n  binary: {\n    audio: binaryData\n  }\n};"
+      },
+      "id": "timing",
+      "name": "ElevenLabs Timing Extraction",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -159,7 +163,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const audioDuration = $('Estimated Audio Timing').first().json.audio_duration;\nconst scenes = $('Claude Response Parser').first().json.scenes;\n\nconst totalHintDuration = scenes.reduce((sum, s) => sum + s.duration_hint, 0);\n\nconst scenesWithDuration = scenes.map(scene => {\n  const proportionalDuration = (scene.duration_hint / totalHintDuration) * audioDuration;\n  const runwayDuration = Math.max(5, Math.min(Math.round(proportionalDuration), 10));\n  return {\n    ...scene,\n    runway_duration: runwayDuration\n  };\n});\n\nconst totalVideoDuration = scenesWithDuration.reduce((sum, s) => sum + s.runway_duration, 0);\nconst durationGap = audioDuration - totalVideoDuration;\n\nreturn {\n  json: {\n    scenes: scenesWithDuration,\n    audio_duration: audioDuration,\n    total_video_duration: totalVideoDuration,\n    duration_gap: durationGap,\n    needs_fallback: durationGap > 2\n  }\n};"
+        "jsCode": "const audioDuration = $('ElevenLabs Timing Extraction').first().json.audio_duration;\nconst scenes = $('Claude Response Parser').first().json.scenes;\n\nconst totalHintDuration = scenes.reduce((sum, s) => sum + s.duration_hint, 0);\n\nconst scenesWithDuration = scenes.map(scene => {\n  const proportionalDuration = (scene.duration_hint / totalHintDuration) * audioDuration;\n  const runwayDuration = Math.max(5, Math.min(Math.round(proportionalDuration), 10));\n  return {\n    ...scene,\n    runway_duration: runwayDuration\n  };\n});\n\nconst totalVideoDuration = scenesWithDuration.reduce((sum, s) => sum + s.runway_duration, 0);\nconst durationGap = audioDuration - totalVideoDuration;\n\nreturn {\n  json: {\n    scenes: scenesWithDuration,\n    audio_duration: audioDuration,\n    total_video_duration: totalVideoDuration,\n    duration_gap: durationGap,\n    needs_fallback: durationGap > 2\n  }\n};"
       },
       "id": "calculate",
       "name": "Calculate Scene Durations",
@@ -300,7 +304,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const scenes = $input.all().map((item, index) => ({\n  scene_id: index + 1,\n  video_url: item.json.video_url,\n  video_task_id: item.json.video_task_id,\n  image_url: item.json.image_url,\n  image_task_id: item.json.image_task_id\n}));\n\nconst audioDuration = $('Estimated Audio Timing').first().json.audio_duration;\nconst audioUrl = $('Build Audio URL').first().json.audio_url;\nconst originalScenes = $('Calculate Scene Durations').first().json.scenes;\n\nreturn {\n  json: {\n    scenes: scenes.map((s, i) => ({\n      ...s,\n      ...originalScenes[i],\n      actual_video_duration: originalScenes[i].runway_duration\n    })),\n    audio_duration: audioDuration,\n    audio_url: audioUrl\n  }\n};"
+        "jsCode": "const scenes = $input.all().map((item, index) => ({\n  scene_id: index + 1,\n  video_url: item.json.video_url,\n  video_task_id: item.json.video_task_id,\n  image_url: item.json.image_url,\n  image_task_id: item.json.image_task_id\n}));\n\nconst audioDuration = $('ElevenLabs Timing Extraction').first().json.audio_duration;\nconst audioUrl = $('Build Audio URL').first().json.audio_url;\nconst originalScenes = $('Calculate Scene Durations').first().json.scenes;\n\nreturn {\n  json: {\n    scenes: scenes.map((s, i) => ({\n      ...s,\n      ...originalScenes[i],\n      actual_video_duration: originalScenes[i].runway_duration\n    })),\n    audio_duration: audioDuration,\n    audio_url: audioUrl\n  }\n};"
       },
       "id": "aggregate",
       "name": "Aggregate Results",
@@ -370,7 +374,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"status\": \"success\",\n  \"execution_id\": \"{{ $('Input Validation').first().json.execution_id }}\",\n  \"video_url\": \"{{ $json.url }}\",\n  \"audio_duration\": {{ $('Estimated Audio Timing').first().json.audio_duration }},\n  \"scenes_count\": {{ $('Aggregate Results').first().json.scenes.length }}\n}",
+        "responseBody": "={\n  \"status\": \"success\",\n  \"execution_id\": \"{{ $('Input Validation').first().json.execution_id }}\",\n  \"video_url\": \"{{ $json.url }}\",\n  \"audio_duration\": {{ $('ElevenLabs Timing Extraction').first().json.audio_duration }},\n  \"scenes_count\": {{ $('Aggregate Results').first().json.scenes.length }}\n}",
         "options": {}
       },
       "id": "success",
@@ -512,7 +516,7 @@
         360
       ],
       "id": "c81f5336-1ce1-4904-9d77-2a1fb621ccbd",
-      "name": "ElevenLabs TTS (No Timestamps)",
+      "name": "ElevenLabs TTS with Timestamps",
       "credentials": {
         "httpBearerAuth": {
           "id": "kjVYrldFpNfzJ2up",
@@ -585,14 +589,14 @@
       "main": [
         [
           {
-            "node": "ElevenLabs TTS (No Timestamps)",
+            "node": "ElevenLabs TTS with Timestamps",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Estimated Audio Timing": {
+    "ElevenLabs Timing Extraction": {
       "main": [
         [
           {
@@ -775,11 +779,11 @@
         ]
       ]
     },
-    "ElevenLabs TTS (No Timestamps)": {
+    "ElevenLabs TTS with Timestamps": {
       "main": [
         [
           {
-            "node": "Estimated Audio Timing",
+            "node": "ElevenLabs Timing Extraction",
             "type": "main",
             "index": 0
           }
