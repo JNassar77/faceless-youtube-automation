@@ -227,7 +227,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const taskId = $input.first().json.id;\nconst apiKey = 'key_454b9d472e9e3332f2ce2e237b8efba36871d460c9d517d0bc8dd342b13a1680b4682140d24d31648975b314460126e1d2fc5fc1b426b59b2e39f0d682d4ad4c';\n\nconst terminalStatuses = ['SUCCEEDED', 'FAILED', 'CANCELLED'];\nlet status = 'PENDING';\nlet output = null;\nlet attempts = 0;\nconst maxAttempts = 80;\nconst maxPollMs = 8 * 60 * 1000;\nconst startTime = Date.now();\n\nwhile (attempts < maxAttempts) {\n  if (Date.now() - startTime > maxPollMs) {\n    throw new Error(`Runway image task ${taskId} timeout after ${(Date.now() - startTime) / 1000}s (last status: ${status})`);\n  }\n\n  const delayMs = 2500 + Math.floor(Math.random() * 1500);\n  await new Promise(r => setTimeout(r, delayMs));\n\n  const response = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `https://api.dev.runwayml.com/v1/tasks/${taskId}`,\n    headers: {\n      'Authorization': `Bearer ${apiKey}`,\n      'X-Runway-Version': '2024-11-06'\n    },\n    json: true\n  });\n\n  status = response.status;\n\n  if (status === 'SUCCEEDED') {\n    output = response.output?.[0] ?? null;\n    break;\n  }\n\n  if (status === 'FAILED' || status === 'CANCELLED') {\n    throw new Error(`Runway image task ${taskId} ended with status ${status}`);\n  }\n\n  if (!terminalStatuses.includes(status)) {\n    attempts++;\n    continue;\n  }\n\n  attempts++;\n}\n\nif (!output) {\n  throw new Error(`Runway image task ${taskId} timeout after ${attempts} attempts (last status: ${status})`);\n}\n\nconst sceneData = $('Scene Loop').first().json;\n\nreturn {\n  json: {\n    ...sceneData,\n    image_url: output,\n    image_task_id: taskId\n  }\n};"
+        "jsCode": "const previousData = $input.first().json;\nconst taskId = previousData.image_task_id ?? previousData.id;\n\nif (!taskId) {\n  throw new Error('Missing Runway image task id on polling input.');\n}\n\nconst maxPollMs = 8 * 60 * 1000;\nconst pollStartedAt = previousData.image_poll_started_at ?? Date.now();\nconst elapsedMs = Date.now() - pollStartedAt;\n\nif (elapsedMs > maxPollMs) {\n  throw new Error(`Runway image task ${taskId} timeout after ${Math.round(elapsedMs / 1000)}s`);\n}\n\nconst response = await this.helpers.httpRequest({\n  method: 'GET',\n  url: `https://api.dev.runwayml.com/v1/tasks/${taskId}`,\n  headers: {\n    'Authorization': 'Bearer key_454b9d472e9e3332f2ce2e237b8efba36871d460c9d517d0bc8dd342b13a1680b4682140d24d31648975b314460126e1d2fc5fc1b426b59b2e39f0d682d4ad4c',\n    'X-Runway-Version': '2024-11-06'\n  },\n  json: true\n});\n\nconst status = response.status ?? 'UNKNOWN';\n\nif (status === 'FAILED' || status === 'CANCELLED') {\n  throw new Error(`Runway image task ${taskId} ended with status ${status}`);\n}\n\nconst result = {\n  ...previousData,\n  image_task_id: taskId,\n  runway_image_status: status,\n  image_poll_started_at: pollStartedAt,\n  image_poll_attempts: (previousData.image_poll_attempts ?? 0) + 1\n};\n\nif (status === 'SUCCEEDED') {\n  const output = response.output?.[0] ?? null;\n\n  if (!output) {\n    throw new Error(`Runway image task ${taskId} succeeded but did not return an output URL`);\n  }\n\n  result.image_url = output;\n}\n\nreturn { json: result };"
       },
       "id": "poll_img",
       "name": "Poll Image Task",
@@ -287,7 +287,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const taskId = $input.first().json.id;\nconst apiKey = \"key_454b9d472e9e3332f2ce2e237b8efba36871d460c9d517d0bc8dd342b13a1680b4682140d24d31648975b314460126e1d2fc5fc1b426b59b2e39f0d682d4ad4c\";\n\nconst terminalStatuses = ['SUCCEEDED', 'FAILED', 'CANCELLED'];\nlet status = 'PENDING';\nlet output = null;\nlet attempts = 0;\nconst maxAttempts = 160;\nconst maxPollMs = 14 * 60 * 1000;\nconst startTime = Date.now();\n\nwhile (attempts < maxAttempts) {\n  if (Date.now() - startTime > maxPollMs) {\n    throw new Error(`Runway video task ${taskId} timeout after ${(Date.now() - startTime) / 1000}s (last status: ${status})`);\n  }\n\n  const delayMs = 3000 + Math.floor(Math.random() * 2000);\n  await new Promise(r => setTimeout(r, delayMs));\n\n  const task = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `https://api.dev.runwayml.com/v1/tasks/${taskId}`,\n    headers: {\n      'Authorization': `Bearer ${apiKey}`,\n      'X-Runway-Version': '2024-11-06'\n    },\n    json: true\n  });\n\n  status = task.status;\n\n  if (status === 'SUCCEEDED') {\n    output = task.output?.[0] ?? null;\n    break;\n  }\n\n  if (status === 'FAILED' || status === 'CANCELLED') {\n    throw new Error(`Runway video task ${taskId} ended with status ${status}`);\n  }\n\n  attempts++;\n}\n\nif (!output) {\n  throw new Error(`Runway video task ${taskId} timeout after ${attempts} attempts (last status: ${status})`);\n}\n\nconst previousData = $input.first().json;\n\nreturn {\n  json: {\n    ...previousData,\n    video_url: output,\n    video_task_id: taskId,\n    status: 'SUCCEEDED'\n  }\n};"
+        "jsCode": "const previousData = $input.first().json;\nconst taskId = previousData.video_task_id ?? previousData.id;\n\nif (!taskId) {\n  throw new Error('Missing Runway video task id on polling input.');\n}\n\nconst maxPollMs = 14 * 60 * 1000;\nconst pollStartedAt = previousData.video_poll_started_at ?? Date.now();\nconst elapsedMs = Date.now() - pollStartedAt;\n\nif (elapsedMs > maxPollMs) {\n  throw new Error(`Runway video task ${taskId} timeout after ${Math.round(elapsedMs / 1000)}s`);\n}\n\nconst task = await this.helpers.httpRequest({\n  method: 'GET',\n  url: `https://api.dev.runwayml.com/v1/tasks/${taskId}`,\n  headers: {\n    'Authorization': 'Bearer key_454b9d472e9e3332f2ce2e237b8efba36871d460c9d517d0bc8dd342b13a1680b4682140d24d31648975b314460126e1d2fc5fc1b426b59b2e39f0d682d4ad4c',\n    'X-Runway-Version': '2024-11-06'\n  },\n  json: true\n});\n\nconst status = task.status ?? 'UNKNOWN';\n\nif (status === 'FAILED' || status === 'CANCELLED') {\n  throw new Error(`Runway video task ${taskId} ended with status ${status}`);\n}\n\nconst result = {\n  ...previousData,\n  video_task_id: taskId,\n  runway_video_status: status,\n  video_poll_started_at: pollStartedAt,\n  video_poll_attempts: (previousData.video_poll_attempts ?? 0) + 1\n};\n\nif (status === 'SUCCEEDED') {\n  const output = task.output?.[0] ?? null;\n\n  if (!output) {\n    throw new Error(`Runway video task ${taskId} succeeded but did not return an output URL`);\n  }\n\n  result.video_url = output;\n  result.status = 'SUCCEEDED';\n}\n\nreturn { json: result };"
       },
       "id": "poll_vid",
       "name": "Poll Video Task",
@@ -538,6 +538,102 @@
       ],
       "id": "afc71c15-ccaa-4dbf-95d7-23c3c9f92fb3",
       "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1f7c908f-677c-402c-a752-947f67ab9a25",
+              "leftValue": "={{ $json.video_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "93127114-6f26-4088-9296-43ba49b79be7",
+      "name": "Video Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -544,
+        -544
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "de269a06-0893-48e4-ae53-cdb60d7739f5",
+      "name": "Wait Before Video Recheck",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -352,
+        -416
+      ],
+      "webhookId": "1b0c6a53-dbb0-43fa-b8d3-2a694bf44cbb"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "08cdd9c3-3e5a-40cc-a374-2365d16b8c4c",
+              "leftValue": "={{ $json.image_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f326c081-136b-4857-a7fa-35836d8f52d8",
+      "name": "Image Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1088,
+        -544
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "seconds"
+      },
+      "id": "f8720834-01cd-4758-87ca-3074ec6e89f5",
+      "name": "Wait Before Image Recheck",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -896,
+        -416
+      ],
+      "webhookId": "12fff821-e46e-41e5-8a23-c607009a1516"
     }
   ],
   "connections": {
@@ -669,7 +765,7 @@
       "main": [
         [
           {
-            "node": "Runway Image to Video",
+            "node": "Image Ready?",
             "type": "main",
             "index": 0
           }
@@ -691,7 +787,7 @@
       "main": [
         [
           {
-            "node": "Scene Loop",
+            "node": "Video Ready?",
             "type": "main",
             "index": 0
           }
@@ -791,6 +887,64 @@
         [
           {
             "node": "Scene Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Ready?": {
+      "main": [
+        [
+          {
+            "node": "Scene Loop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Before Video Recheck",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Before Video Recheck": {
+      "main": [
+        [
+          {
+            "node": "Poll Video Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Ready?": {
+      "main": [
+        [
+          {
+            "node": "Runway Image to Video",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Before Image Recheck",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Before Image Recheck": {
+      "main": [
+        [
+          {
+            "node": "Poll Image Task",
             "type": "main",
             "index": 0
           }
