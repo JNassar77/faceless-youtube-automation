@@ -1,0 +1,1057 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "youtube-automation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ef8c6329-bfda-444d-b0e1-6f4d86907880",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -4000,
+        712
+      ],
+      "webhookId": "b386ff07-8460-41e2-88df-3bd8bfbca41d"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json.body;\nconst errors = [];\n\nif (!input.topic || input.topic.length < 10 || input.topic.length > 200) {\n  errors.push({ field: \"topic\", message: \"Must be 10-200 chars\", received: input.topic });\n}\nif (input.topic && !/^[a-zA-Z0-9äöüÄÖÜß\\s\\-_,.!?]+$/.test(input.topic)) {\n  errors.push({ field: \"topic\", message: \"Contains invalid characters\", received: input.topic });\n}\n\nconst validStyles = [\"cinematic\", \"documentary\", \"educational\"];\nconst style = input.style || \"cinematic\";\nif (!validStyles.includes(style)) {\n  errors.push({ field: \"style\", message: \"Must be: \" + validStyles.join(\", \"), received: style });\n}\n\nconst duration = parseInt(input.target_duration) || 60;\nif (duration < 30 || duration > 180) {\n  errors.push({ field: \"target_duration\", message: \"Must be 30-180\", received: duration });\n}\n\nconst validChannels = [\"hausarzt\", \"aesthetik\", \"ki\"];\nconst channel = (input.channel || \"aesthetik\").toLowerCase().trim();\nif (!validChannels.includes(channel)) {\n  errors.push({\n    field: \"channel\",\n    message: \"Must be: \" + validChannels.join(\", \"),\n    received: channel\n  });\n}\n\nif (errors.length > 0) {\n  return { json: { valid: false, errors } };\n}\n\nreturn {\n  json: {\n    valid: true,\n    validated_data: {\n      topic: input.topic.trim(),\n      style,\n      target_duration: duration,\n      channel: channel\n    },\n    execution_id: $execution.id\n  }\n};"
+      },
+      "id": "f39943c6-5906-4808-aba5-b7087c105eb7",
+      "name": "Input Validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3776,
+        712
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const PRESETS = {\n  hausarzt: {\n    channel_name: \"Hausarzt\",\n    style_reference: \"medical_clean_001\",\n    camera_style: \"Ruhige statische Einstellungen, sanfte langsame Zooms auf medizinische Details, gelegentliche horizontale Schwenks\",\n    lighting_style: \"Gleichmäßiges weiches Tageslicht, neutralweiße Beleuchtung, keine harten Schatten\",\n    palette: [\"#F5F5F5\", \"#1A73E8\", \"#34A853\", \"#E8EAED\", \"#202124\"],\n    visual_world: \"Medizinische Praxis-Umgebung ohne Menschen: Stethoskop-Nahaufnahmen, behandschuhte Hände an Instrumenten, EKG-Monitore mit Kurven, Laborgeräte mit blinkenden LEDs, Pillen und Medikamente in Makro, anatomische Modelle. ABSOLUT KEINE Gesichter oder erkennbare Personen.\",\n    voice_stability: 0.7,\n    voice_similarity: 0.8,\n    text_overlay_color: \"#1A73E8\",\n    overlay_font_weight: \"600\",\n    motion_keywords: \"minimal, ruhig, professionell, vertrauenswürdig\",\n    target_audience: \"Patienten und Gesundheitsinteressierte im deutschsprachigen Raum\",\n    language_style: \"Verständlich, empathisch, medizinisch korrekt aber laienverständlich. Wie ein erfahrener Hausarzt, der einem Patienten etwas erklärt.\"\n  },\n  aesthetik: {\n    channel_name: \"Ästhetische Medizin\",\n    style_reference: \"luxury_aesthetic_001\",\n    camera_style: \"Elegante langsame Dolly-Fahrten vorwärts, Makro-Aufnahmen mit extrem geringer Schärfentiefe, weiche Fokus-Pulls zwischen Vorder- und Hintergrund\",\n    lighting_style: \"Weiches diffuses Hauptlicht von oben-seitlich, subtile warme Glanzlichter auf Oberflächen, dezentes Rim-Lighting für Tiefe, Specular Highlights auf Glas und Metall\",\n    palette: [\"#F5F0EB\", \"#C9A87C\", \"#2C2C2C\", \"#E7CFCF\", \"#8B6F5E\"],\n    visual_world: \"Premium-Klinik-Ästhetik: Behandlungsräume in minimalistischem skandinavischem Design, hochwertige Hautpflege-Produkte und Seren in Nahaufnahme, Injektionsnadel-Details ohne Gesicht, sterile Metalloberflächen mit warmem Lichtspiel, Hauttextur-Makros ohne erkennbare Person, weiße Handschuhe bei der Arbeit, Tropfen die von einer Pipette fallen. ABSOLUT KEINE Gesichter.\",\n    voice_stability: 0.6,\n    voice_similarity: 0.85,\n    text_overlay_color: \"#C9A87C\",\n    overlay_font_weight: \"300\",\n    motion_keywords: \"elegant, langsam, luxuriös, präzise\",\n    target_audience: \"Ästhetik-interessierte Kunden im Premium-Segment, 30-55 Jahre, deutsch\",\n    language_style: \"Elegant und vertrauensvoll, wie eine Beratung in einer High-End-Klinik. Medizinisch fundiert aber zugänglich. Keine reißerischen Versprechen.\"\n  },\n  ki: {\n    channel_name: \"KI & Technologie\",\n    style_reference: \"cinematic_tech_001\",\n    camera_style: \"Langsame Dolly-Fahrten vorwärts durch Räume, sanfte Schwenks über technische Oberflächen, gelegentliche Vogelperspektive auf Datenlandschaften\",\n    lighting_style: \"Dramatisches Seitenlicht mit langen Schatten, volumetrisches Licht durch Dunst, kühle blaue LED-Akzente, warme Akzente als Kontrast, Neon-Reflexionen auf glänzenden Oberflächen\",\n    palette: [\"#0B1120\", \"#00B4D8\", \"#90E0EF\", \"#E0E0E0\", \"#7B2FF7\"],\n    visual_world: \"Futuristische Tech-Umgebung: Server-Racks mit rhythmisch blinkenden blauen und grünen LEDs, holographische Datenvisualisierungen über dunklen Tischen, Roboter-Arme die präzise arbeiten, Mikrochip-Makros mit Lötpunkten, abstrakte leuchtende Netzwerk-Knoten, Monitore mit unscharfem Code. ABSOLUT KEINE Gesichter oder erkennbare Personen.\",\n    voice_stability: 0.55,\n    voice_similarity: 0.8,\n    text_overlay_color: \"#00B4D8\",\n    overlay_font_weight: \"700\",\n    motion_keywords: \"dynamisch, majestätisch, zukunftsorientiert, faszinierend\",\n    target_audience: \"Tech-Interessierte, KMU-Entscheider und Early Adopters im deutschsprachigen Raum\",\n    language_style: \"Faszinierend und mitreißend, wie eine hochwertige Technik-Dokumentation. Komplexes einfach erklären, ohne herablassend zu wirken. Staunen erzeugen.\"\n  }\n};\n\nconst validatedData = $input.first().json;\n\nif (!validatedData.valid) {\n  return { json: validatedData };\n}\n\nconst channel = validatedData.validated_data.channel;\nconst preset = PRESETS[channel];\n\nif (!preset) {\n  return {\n    json: {\n      valid: false,\n      errors: [{ field: \"channel\", message: \"Unknown channel preset\", received: channel }]\n    }\n  };\n}\n\nreturn {\n  json: {\n    ...validatedData,\n    preset: preset\n  }\n};"
+      },
+      "id": "140ff8c8-42ae-4d4e-917d-cc8801d8e5ee",
+      "name": "Apply Channel Preset",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3552,
+        712
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "id": "c133b7ab-101a-4bba-89cd-8906433c9eb0"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "66c39503-ae28-4955-8b6b-820f9ba0340f",
+      "name": "Validation Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -3328,
+        712
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "=={\n  \"status\": \"error\",\n  \"message\": \"Validation failed\",\n  \"errors\": {{ JSON.stringify($json.errors) }}\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "b4757ec5-88d7-440b-ab16-a76c070db9e6",
+      "name": "Error Response 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -3040,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const responseText = $input.first().json.content[0].text;\nlet parsed;\n\ntry {\n  parsed = JSON.parse(responseText);\n} catch (e) {\n  const match = responseText.match(/```json?\\s*([\\s\\S]*?)```/);\n  if (match) {\n    parsed = JSON.parse(match[1]);\n  } else {\n    throw new Error(\"Claude returned invalid JSON: \" + responseText.substring(0, 200));\n  }\n}\n\nif (!parsed.script || !parsed.scenes || parsed.scenes.length === 0) {\n  throw new Error(\"Claude response missing required fields\");\n}\n\nfor (const scene of parsed.scenes) {\n  if (!scene.image_prompt) {\n    throw new Error(\"Scene \" + scene.id + \" missing image_prompt\");\n  }\n  if (!scene.motion_prompt) {\n    throw new Error(\"Scene \" + scene.id + \" missing motion_prompt\");\n  }\n}\n\nif (!parsed.metadata?.master_seed_suggestion) {\n  parsed.metadata = parsed.metadata || {};\n  parsed.metadata.master_seed_suggestion = Math.floor(Math.random() * 9000000) + 1000000;\n}\n\nreturn { json: parsed };"
+      },
+      "id": "e7844cb7-d3f8-46c7-a852-664f2057d6a4",
+      "name": "Claude Response Parser",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2752,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first();\nconst binaryData = input.binary?.data;\n\nif (!binaryData) {\n  throw new Error('No audio data found');\n}\n\nfunction parseFileSizeToBytes(fileSize) {\n  if (typeof fileSize === 'number') return fileSize;\n  if (typeof fileSize !== 'string') return 0;\n\n  const normalized = fileSize.trim().replace(',', '.');\n  const match = normalized.match(/(\\d+\\.?\\d*)\\s*(B|KB|MB|GB)?/i);\n  if (!match) return 0;\n\n  const value = parseFloat(match[1]);\n  const unit = (match[2] || 'B').toUpperCase();\n  const multipliers = { B: 1, KB: 1024, MB: 1024 ** 2, GB: 1024 ** 3 };\n  return value * (multipliers[unit] || 1);\n}\n\nfunction estimateBitrateFromMp3Header(buffer) {\n  if (!buffer || buffer.length < 4) return null;\n\n  let offset = 0;\n  if (buffer.slice(0, 3).toString('ascii') === 'ID3' && buffer.length > 10) {\n    const size = ((buffer[6] & 0x7f) << 21) | ((buffer[7] & 0x7f) << 14) | ((buffer[8] & 0x7f) << 7) | (buffer[9] & 0x7f);\n    offset = 10 + size;\n  }\n\n  const bitratesMpeg1L3 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];\n  const bitratesMpeg2L3 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0];\n\n  for (let i = offset; i < buffer.length - 4; i++) {\n    const b1 = buffer[i];\n    const b2 = buffer[i + 1];\n    if (b1 !== 0xff || (b2 & 0xe0) !== 0xe0) continue;\n\n    const versionBits = (b2 >> 3) & 0x03;\n    const layerBits = (b2 >> 1) & 0x03;\n    if (layerBits !== 0x01) continue;\n\n    const b3 = buffer[i + 2];\n    const bitrateIndex = (b3 >> 4) & 0x0f;\n\n    if (versionBits === 0x03) return bitratesMpeg1L3[bitrateIndex] || null;\n    if (versionBits === 0x02 || versionBits === 0x00) return bitratesMpeg2L3[bitrateIndex] || null;\n  }\n\n  return null;\n}\n\nlet audioBytes = parseFileSizeToBytes(binaryData.fileSize);\nlet buffer = null;\n\nif (typeof binaryData.data === 'string') {\n  try {\n    buffer = Buffer.from(binaryData.data, 'base64');\n    if (!audioBytes) audioBytes = buffer.length;\n  } catch (error) {\n    console.log('Could not decode base64 audio buffer:', error.message);\n  }\n}\n\nif (!audioBytes || audioBytes <= 0) {\n  throw new Error('Could not determine audio size for duration estimation');\n}\n\nconst bitrateKbps = estimateBitrateFromMp3Header(buffer) || 128;\nconst estimatedDuration = audioBytes / ((bitrateKbps * 1000) / 8);\n\nconst executionId = $('Input Validation').first().json.execution_id;\n\nreturn {\n  json: {\n    audio_duration: Math.round(estimatedDuration * 10) / 10,\n    alignment: null,\n    normalized_alignment: null,\n    timing_mode: 'estimated_from_size_and_header',\n    execution_id: executionId\n  },\n  binary: {\n    audio: binaryData\n  }\n};"
+      },
+      "id": "bf063530-804d-40ff-9ebd-c5e24675277e",
+      "name": "ElevenLabs Timing Extraction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2304,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://ywdwvjriklaevktswnwe.supabase.co/storage/v1/object/audio/{{ $json.execution_id }}.mp3",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "audio/mpeg"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "=audio",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "22d21dc9-19b5-48c2-bf39-97d1842b1c84",
+      "name": "Supabase Audio Upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -2080,
+        592
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "f8iz392lw94fjHLf",
+          "name": "Supabase NovaCoreDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const audioDuration = $('ElevenLabs Timing Extraction').first().json.audio_duration;\nconst executionId = $json.execution_id;\nconst finalExecutionId = executionId || $('ElevenLabs Timing Extraction').first().json.execution_id;\nconst supabaseUrl = 'https://ywdwvjriklaevktswnwe.supabase.co';\nconst audioUrl = `${supabaseUrl}/storage/v1/object/public/audio/${finalExecutionId}.mp3`;\n\nconsole.log('Audio Duration:', audioDuration);\nconsole.log('Execution ID:', finalExecutionId);\nconsole.log('Audio URL:', audioUrl);\n\nreturn {\n  json: {\n    audio_url: audioUrl,\n    audio_duration: audioDuration,\n    execution_id: finalExecutionId\n  }\n};"
+      },
+      "id": "357d0f65-1f09-4e69-b587-bcb3ea683965",
+      "name": "Build Audio URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1856,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const audioDuration = $('ElevenLabs Timing Extraction').first().json.audio_duration;\nconst scenes = $('Claude Response Parser').first().json.scenes;\nconst masterSeed = $('Claude Response Parser').first().json.metadata?.master_seed_suggestion || Math.floor(Math.random() * 9000000) + 1000000;\n\nconst totalHintDuration = scenes.reduce((sum, s) => sum + s.duration_hint, 0);\n\nconst scenesWithDuration = scenes.map((scene, index) => {\n  const proportionalDuration = (scene.duration_hint / totalHintDuration) * audioDuration;\n  const runwayDuration = Math.max(5, Math.min(Math.round(proportionalDuration), 10));\n  return {\n    ...scene,\n    runway_duration: runwayDuration,\n    seed: masterSeed + (index * 1000)\n  };\n});\n\nconst totalVideoDuration = scenesWithDuration.reduce((sum, s) => sum + s.runway_duration, 0);\nconst durationGap = audioDuration - totalVideoDuration;\n\nreturn {\n  json: {\n    scenes: scenesWithDuration,\n    audio_duration: audioDuration,\n    total_video_duration: totalVideoDuration,\n    duration_gap: durationGap,\n    needs_fallback: durationGap > 2\n  }\n};"
+      },
+      "id": "87cdc2a3-9571-4988-a013-293936db8e57",
+      "name": "Calculate Scene Durations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1632,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "eeec7b47-4c5d-4489-9c66-f0a9031ae097",
+      "name": "Scene Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1184,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dev.runwayml.com/v1/text_to_image",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Runway-Version",
+              "value": "2024-11-06"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"promptText\": \"{{ $json.scenes.image_prompt }}\",\n  \"ratio\": \"1280:720\",\n  \"model\": \"gen4_image\",\n  \"seed\": {{ $json.scenes.seed }}\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "7aeb273a-7d7c-458c-bdab-68ab68a6c46c",
+      "name": "Runway Text to Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -960,
+        232
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AvNdRYLzdHimAsuV",
+          "name": "Nathans Api Key Training N8n"
+        },
+        "httpBearerAuth": {
+          "id": "kjVYrldFpNfzJ2up",
+          "name": "Runway Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const previousData = $input.first().json;\nconst taskId = previousData.image_task_id ?? previousData.id;\n\nif (!taskId) {\n  throw new Error('Missing Runway image task id on polling input.');\n}\n\nconst maxPollMs = 8 * 60 * 1000;\nconst pollStartedAt = previousData.image_poll_started_at ?? Date.now();\nconst elapsedMs = Date.now() - pollStartedAt;\n\nif (elapsedMs > maxPollMs) {\n  throw new Error(`Runway image task ${taskId} timeout after ${Math.round(elapsedMs / 1000)}s`);\n}\n\nconst sceneContext = previousData.scenes\n  ?? $('Scene Loop').first().json.scenes\n  ?? $('Split Out').first().json.scenes\n  ?? null;\n\nconst response = await this.helpers.httpRequest({\n  method: 'GET',\n  url: `https://api.dev.runwayml.com/v1/tasks/${taskId}`,\n  headers: {\n    'Authorization': 'Bearer key_454b9d472e9e3332f2ce2e237b8efba36871d460c9d517d0bc8dd342b13a1680b4682140d24d31648975b314460126e1d2fc5fc1b426b59b2e39f0d682d4ad4c',\n    'X-Runway-Version': '2024-11-06'\n  },\n  json: true\n});\n\nconst status = response.status ?? 'UNKNOWN';\n\nif (status === 'FAILED' || status === 'CANCELLED') {\n  throw new Error(`Runway image task ${taskId} ended with status ${status}`);\n}\n\nconst result = {\n  ...previousData,\n  scenes: sceneContext,\n  image_task_id: taskId,\n  runway_image_status: status,\n  image_poll_started_at: pollStartedAt,\n  image_poll_attempts: (previousData.image_poll_attempts ?? 0) + 1\n};\n\nif (status === 'SUCCEEDED') {\n  const output = response.output?.[0] ?? null;\n\n  if (!output) {\n    throw new Error(`Runway image task ${taskId} succeeded but did not return an output URL`);\n  }\n\n  result.image_url = output;\n}\n\nreturn { json: result };"
+      },
+      "id": "6750b9d4-7b51-46ff-9ed1-75e5ef214c00",
+      "name": "Poll Image Task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -736,
+        232
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dev.runwayml.com/v1/image_to_video",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Runway-Version",
+              "value": "2024-11-06"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "=raw",
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "rawContentType": "application/json",
+        "body": "={\n  \"model\": \"gen4_turbo\",\n  \"promptImage\": \"{{ $json.image_url }}\",\n  \"promptText\": \"{{ $json.scenes?.motion_prompt || $json.motion_prompt || '' }}\",\n  \"ratio\": \"1280:720\",\n  \"duration\": {{ $json.scenes?.runway_duration || $json.runway_duration || 5 }}\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "ecbb4aea-25ec-4754-ac50-fbc7f6338f76",
+      "name": "Runway Image to Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -288,
+        184
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AvNdRYLzdHimAsuV",
+          "name": "Nathans Api Key Training N8n"
+        },
+        "httpBearerAuth": {
+          "id": "kjVYrldFpNfzJ2up",
+          "name": "Runway Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const previousData = $input.first().json;\nconst taskId = previousData.video_task_id ?? previousData.id;\n\nif (!taskId) {\n  throw new Error('Missing Runway video task id on polling input.');\n}\n\nconst maxPollMs = 14 * 60 * 1000;\nconst pollStartedAt = previousData.video_poll_started_at ?? Date.now();\nconst elapsedMs = Date.now() - pollStartedAt;\n\nif (elapsedMs > maxPollMs) {\n  throw new Error(`Runway video task ${taskId} timeout after ${Math.round(elapsedMs / 1000)}s`);\n}\n\nconst sceneContext = previousData.scenes\n  ?? $('Image Ready?').first().json.scenes\n  ?? $('Scene Loop').first().json.scenes\n  ?? $('Split Out').first().json.scenes\n  ?? null;\n\nconst imageContext = previousData.image_url\n  ?? $('Image Ready?').first().json.image_url\n  ?? null;\n\nconst imageTaskContext = previousData.image_task_id\n  ?? $('Image Ready?').first().json.image_task_id\n  ?? null;\n\nconst task = await this.helpers.httpRequest({\n  method: 'GET',\n  url: `https://api.dev.runwayml.com/v1/tasks/${taskId}`,\n  headers: {\n    'Authorization': 'Bearer key_454b9d472e9e3332f2ce2e237b8efba36871d460c9d517d0bc8dd342b13a1680b4682140d24d31648975b314460126e1d2fc5fc1b426b59b2e39f0d682d4ad4c',\n    'X-Runway-Version': '2024-11-06'\n  },\n  json: true\n});\n\nconst status = task.status ?? 'UNKNOWN';\n\nif (status === 'FAILED' || status === 'CANCELLED') {\n  throw new Error(`Runway video task ${taskId} ended with status ${status}`);\n}\n\nconst result = {\n  ...previousData,\n  scenes: sceneContext,\n  image_url: imageContext,\n  image_task_id: imageTaskContext,\n  video_task_id: taskId,\n  runway_video_status: status,\n  video_poll_started_at: pollStartedAt,\n  video_poll_attempts: (previousData.video_poll_attempts ?? 0) + 1\n};\n\nif (status === 'SUCCEEDED') {\n  const output = task.output?.[0] ?? null;\n\n  if (!output) {\n    throw new Error(`Runway video task ${taskId} succeeded but did not return an output URL`);\n  }\n\n  result.video_url = output;\n  result.status = 'SUCCEEDED';\n}\n\nreturn { json: result };"
+      },
+      "id": "8afedf2d-d532-40fe-a1a0-81b6ff705dc0",
+      "name": "Poll Video Task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        184
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const scenes = $input.all().map((item, index) => ({\n  scene_id: index + 1,\n  video_url: item.json.video_url,\n  video_task_id: item.json.video_task_id,\n  image_url: item.json.image_url,\n  image_task_id: item.json.image_task_id\n}));\n\nconst audioDuration = $('ElevenLabs Timing Extraction').first().json.audio_duration;\nconst audioUrl = $('Build Audio URL').first().json.audio_url;\nconst originalScenes = $('Calculate Scene Durations').first().json.scenes;\n\nreturn {\n  json: {\n    scenes: scenes.map((s, i) => ({\n      ...s,\n      ...originalScenes[i],\n      actual_video_duration: originalScenes[i].runway_duration\n    })),\n    audio_duration: audioDuration,\n    audio_url: audioUrl\n  }\n};"
+      },
+      "id": "d3c64eb4-13e8-4fd8-b538-388f342a01cc",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        616
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const scenes = $json.scenes;\nconst audioDuration = $json.audio_duration;\nconst audioUrl = $json.audio_url;\n\nif (!Array.isArray(scenes) || scenes.length === 0) {\n  throw new Error(\"No scenes found in $json.scenes\");\n}\nif (!audioUrl) {\n  throw new Error(\"No audio_url found in $json.audio_url\");\n}\nif (typeof audioDuration !== \"number\" || Number.isNaN(audioDuration)) {\n  throw new Error(\"audio_duration is missing or not a number\");\n}\n\nconst modifications = {\n  \"Audio-Track\": audioUrl,\n  \"Audio-Track.duration\": audioDuration,\n};\n\nconst preset = $('Apply Channel Preset')?.first()?.json?.preset;\n\nif (preset) {\n  modifications[\"Text-Overlay-Color\"] = preset.text_overlay_color;\n}\n\nlet cumulativeTime = 0;\n\nscenes.forEach((scene, index) => {\n  const sceneNum = index + 1;\n\n  if (!scene.video_url) {\n    throw new Error(`Scene ${sceneNum} missing video_url`);\n  }\n\n  const dur = Number(scene.actual_video_duration ?? scene.runway_duration ?? scene.duration_hint ?? 5);\n  const sceneDuration = Math.max(0, Math.min(10, Math.round(dur)));\n\n  const videoKey = `Scene-${sceneNum}-Video`;\n  const textKey = `Scene-${sceneNum}-Text`;\n\n  modifications[`${videoKey}.source`] = scene.video_url;\n  modifications[`${videoKey}.time`] = cumulativeTime;\n  modifications[`${videoKey}.duration`] = sceneDuration;\n\n  if (index > 0) {\n    modifications[`${videoKey}.animation`] = \"fade\";\n    modifications[`${videoKey}.animation_duration`] = 0.5;\n  }\n\n  if (scene.text_overlay) {\n    const start = Number(scene.overlay_timing?.start ?? 1);\n    const end = Number(scene.overlay_timing?.end ?? (sceneDuration - 1));\n\n    const safeStart = Math.max(1, Math.min(sceneDuration - 1, start));\n    const safeEnd = Math.max(safeStart + 0.5, Math.min(sceneDuration - 1, end));\n\n    modifications[`${textKey}.text`] = String(scene.text_overlay);\n    modifications[`${textKey}.time`] = cumulativeTime + safeStart;\n    modifications[`${textKey}.duration`] = Math.max(0.5, safeEnd - safeStart);\n  } else {\n    modifications[`${textKey}.text`] = \"\";\n    modifications[`${textKey}.duration`] = 0;\n  }\n\n  cumulativeTime += sceneDuration;\n});\n\nconst totalScenes = 12;\nconst usedScenes = scenes.length;\n\nfor (let i = usedScenes + 1; i <= totalScenes; i++) {\n  const videoKey = `Scene-${i}-Video`;\n  const textKey = `Scene-${i}-Text`;\n\n  modifications[`${videoKey}.source`] = \"\";\n  modifications[`${videoKey}.duration`] = 0;\n\n  modifications[`${textKey}.text`] = \"\";\n  modifications[`${textKey}.duration`] = 0;\n}\n\nconst executionId =\n  $(\"Input Validation\")?.first()?.json?.execution_id ||\n  $execution.id ||\n  \"unknown\";\n\nconst metadata = JSON.stringify({ execution_id: executionId });\n\nreturn {\n  json: {\n    template_id: \"75b2838d-bbdf-42ee-86b1-507e37c85760\",\n    modifications,\n    webhook_url: $execution.resumeUrl,\n    metadata,\n  },\n};"
+      },
+      "id": "54615c6a-a0a2-475a-8110-612430600392",
+      "name": "Build Creatomate Modifications",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -736,
+        616
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.creatomate.com/v2/renders",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "dfa7f3c6-d2df-48ab-9c0a-18cb54542a0c",
+      "name": "Creatomate Render Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -512,
+        616
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "2w0pNEi74U6ztfC8",
+          "name": "Creatomate Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "POST",
+        "options": {}
+      },
+      "id": "793d5f7c-5ae4-42df-b7b3-b25180a22340",
+      "name": "Wait for Render Complete",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -288,
+        616
+      ],
+      "webhookId": "362a5508-d8eb-4c23-88f8-741cdbf0996f"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"success\",\n  \"execution_id\": \"{{ $('Input Validation').first().json.execution_id }}\",\n  \"video_url\": \"{{ $json.url }}\",\n  \"audio_duration\": {{ $('ElevenLabs Timing Extraction').first().json.audio_duration }},\n  \"scenes_count\": {{ $('Aggregate Results').first().json.scenes.length }}\n}",
+        "options": {}
+      },
+      "id": "d2dfdec1-1799-47aa-87b9-1066466a739b",
+      "name": "Success Response 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        616
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "f9bcde5e-c4f8-4a19-97a3-800e9f5a6cba",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -4000,
+        1008
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/workflow_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "6cb54fea-92cc-4db2-9246-044c41893084",
+      "name": "Log Error to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -3776,
+        1008
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"error\",\n  \"execution_id\": \"{{ $execution.id }}\",\n  \"message\": \"Internal workflow error\"\n}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "30c1f083-4710-449f-9285-5b542ca8581b",
+      "name": "Error Response 500",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -3552,
+        1008
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-5-20250929"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Topic: {{ $json.validated_data.topic }}\nStyle: {{ $json.validated_data.style }}\nTarget Duration: {{ $json.validated_data.target_duration }}s\n\nCHANNEL CONTEXT:\nChannel: {{ $json.preset.channel_name }}\nVisual World: {{ $json.preset.visual_world }}\nCamera Style: {{ $json.preset.camera_style }}\nLighting: {{ $json.preset.lighting_style }}\nColor Palette: {{ JSON.stringify($json.preset.palette) }}\nMotion Keywords: {{ $json.preset.motion_keywords }}\nLanguage Style: {{ $json.preset.language_style }}\nTarget Audience: {{ $json.preset.target_audience }}\nStyle Reference: {{ $json.preset.style_reference }}"
+            }
+          ]
+        },
+        "options": {
+          "system": "=ROLE: FACELESS YOUTUBE CONTENT ARCHITECT\n\nDu bist ein spezialisierter Content-Generator für automatisierte faceless YouTube-Videos.\nDeine Ausgabe fließt DIREKT in eine automatische Video-Pipeline (ElevenLabs → Runway Gen-4 → Creatomate).\nJede Abweichung vom Schema bricht die Pipeline. Präzision ist nicht optional.\n\n═══════════════════════════════════════════════\nREGEL 1: OUTPUT FORMAT (NICHT VERHANDELBAR)\n═══════════════════════════════════════════════\n\n- Antworte AUSSCHLIESSLICH mit einem EINZIGEN, flachen JSON-Objekt.\n- KEIN Markdown. KEINE Prosa. KEIN Text vor oder nach dem JSON.\n- KEINE Codeblöcke (keine ```). Nur raw JSON.\n- Das erste Zeichen deiner Antwort ist \"{\", das letzte ist \"}\".\n\n═══════════════════════════════════════════════\nREGEL 2: SCRIPT (für ElevenLabs TTS)\n═══════════════════════════════════════════════\n\nDas \"script\"-Feld wird DIREKT an eine Text-to-Speech API übergeben.\nOptimiere für gesprochene Sprache:\n\n- Natürliche, fließende Sätze. Kein Stakkato.\n- Zahlen AUSGESCHRIEBEN: \"fünfundzwanzig\" statt \"25\"\n- Abkürzungen AUSGESCHRIEBEN: \"zum Beispiel\" statt \"z.B.\"\n- Pausen durch \"...\" (genau 3 Punkte, max 2 pro Absatz)\n- Keine Sonderzeichen außer: . , ! ? - ...\n- Keine Emojis, keine Hashtags, keine URLs.\n- Sprechgeschwindigkeit: ~150 Wörter pro Minute\n- Ziel-Wortanzahl: (target_duration / 60) × 150\n- Tonalität: Richte dich nach dem \"language_style\" aus den Channel-Informationen.\n\nVERBOTEN im Script:\n- Klammern (), Doppelpunkte :, Semikolons ;\n- Aufzählungszeichen, Nummerierungen\n- \"Abschnitt eins\", \"erstens\" (klingt robotisch)\n- Meta-Kommentare (\"In diesem Video...\", \"Willkommen...\")\n\n═══════════════════════════════════════════════\nREGEL 3: IMAGE PROMPTS (für Runway Gen-4 Bildgenerierung)\n═══════════════════════════════════════════════\n\nJede Scene hat ein \"image_prompt\"-Feld das an Runway Gen-4 Image Generation geht.\nDas Bild wird das STARTFRAME des Videos. Es definiert WAS im Bild ist.\n\nMUSS enthalten (in dieser Reihenfolge):\n1. SHOT TYPE: \"Extreme close-up\", \"Wide establishing shot\", \"Medium shot\", \"Overhead shot\"\n2. SUBJECT: Was ist im Bild? Detailliert beschreiben. Nutze die \"visual_world\" Vorgabe.\n3. COMPOSITION: Bildaufbau, Tiefenschärfe, Vorder-/Hintergrund\n4. LIGHTING: Lichtsituation gemäß \"lighting_style\" Vorgabe\n5. COLOR/MOOD: Farbwelt gemäß \"palette\" Vorgabe\n6. QUALITY: \"photorealistic\", \"cinematic depth of field\", \"8K detail\", \"film grain\"\n7. STYLE: Immer den \"style_reference\" String verwenden\n\nPROMPT-LÄNGE: 200-800 Zeichen.\n\nVERBOTEN in Image Prompts:\n- Gesichter, erkennbare Menschen, Augen, Mund\n- Text, Buchstaben, Zahlen, Logos im Bild\n- Mehrere Szenen oder Zeitabläufe (es ist EIN Standbild!)\n- Abstrakte oder konzeptuelle Begriffe — nur physisch Sichtbares beschreiben\n\n═══════════════════════════════════════════════\nREGEL 4: MOTION PROMPTS (für Runway Gen-4 Video)\n═══════════════════════════════════════════════\n\nJede Scene hat ein \"motion_prompt\"-Feld das an Runway Gen-4 Image-to-Video geht.\nEs beschreibt NUR die BEWEGUNG die auf dem Startbild passieren soll.\n\nRUNWAY GEN-4 SPEZIFISCHE REGELN:\n- Beschreibe NUR physische Bewegung, nicht Konzepte oder Gefühle\n- KEINE negativen Formulierungen! NICHT \"no camera movement\" → STATTDESSEN \"camera remains perfectly still\"\n- KEINE Szenenwechsel innerhalb eines Clips (jeder Clip = eine durchgehende Einstellung)\n- Halte Prompts einfach: Eine Hauptbewegung pro Clip reicht\n- Beschreibe Kamerabewegung UND Subjektbewegung getrennt\n\nGUTE Motion Prompts:\n- \"slow dolly forward, soft ambient light gradually shifts warmer, dust particles drift through the frame\"\n- \"gentle zoom in on the surface, liquid droplet slides slowly down the glass, reflections shimmer\"\n- \"camera pans slowly to the right, steam rises gently from the surface, warm light flickers subtly\"\n\nSCHLECHTE Motion Prompts:\n- \"the scene conveys a feeling of luxury\" (zu abstrakt!)\n- \"no movement, nothing happens\" (negative Formulierung!)\n- \"cut to close-up, then zoom out\" (Szenenwechsel!)\n\nPROMPT-LÄNGE: 80-300 Zeichen. Kürzer als Image Prompts!\n\n═══════════════════════════════════════════════\nREGEL 5: SCENE STRUCTURE\n═══════════════════════════════════════════════\n\n- \"duration_hint\": 5–10 Sekunden pro Scene (Runway max 10s)\n- Summe aller duration_hints ≈ target_duration (±10% Toleranz)\n- Minimum 4 Scenes, Maximum 12 Scenes\n- Scenes müssen narrativ zueinander passen\n\nTEXT OVERLAYS:\n- \"text_overlay\": Maximum 5 Wörter. Oder null.\n- \"overlay_timing.start\": Frühestens 1.0s nach Scene-Start\n- \"overlay_timing.end\": Spätestens 1.0s vor Scene-Ende\n\nKONSISTENZ-REGELN:\n- ALLE Scenes nutzen den GLEICHEN style_reference String\n- Farbpalette bleibt über alle Scenes identisch\n- Lichtstimmung ändert sich nur graduell\n- Kamerabewegungen bleiben im gleichen Tempo-Bereich\n\n═══════════════════════════════════════════════\nREGEL 6: METADATA\n═══════════════════════════════════════════════\n\n- \"total_scenes\": Muss mit scenes.length übereinstimmen\n- \"estimated_duration\": Summe aller duration_hints\n- \"style_palette\": Array mit 3-5 HEX-Codes (aus der Channel-Palette)\n- \"camera_style\": 1 String\n- \"lighting_style\": 1 String\n- \"master_seed_suggestion\": Zufällige Ganzzahl zwischen 1000000 und 9999999\n\n═══════════════════════════════════════════════\nOUTPUT SCHEMA (EXAKT EINHALTEN)\n═══════════════════════════════════════════════\n\n{\n  \"script\": \"Vollständiger Sprechtext...\",\n  \"scenes\": [\n    {\n      \"id\": 1,\n      \"image_prompt\": \"Extreme close-up of premium skincare serum bottle on white marble surface, soft diffused top-light with warm specular highlights on glass, shallow depth of field with bokeh in background, warm ivory and gold tones, photorealistic product photography, 8K detail, luxury_aesthetic_001\",\n      \"motion_prompt\": \"gentle slow zoom in toward the bottle cap, a single drop of golden serum slides down the glass surface, warm light reflections shift subtly\",\n      \"style_reference\": \"luxury_aesthetic_001\",\n      \"duration_hint\": 7,\n      \"text_overlay\": \"Premium Pflege\" | null,\n      \"overlay_timing\": { \"start\": 2.0, \"end\": 5.5 } | null\n    }\n  ],\n  \"metadata\": {\n    \"total_scenes\": 6,\n    \"estimated_duration\": 60,\n    \"style_palette\": [\"#F5F0EB\", \"#C9A87C\", \"#2C2C2C\"],\n    \"camera_style\": \"slow_elegant_movements\",\n    \"lighting_style\": \"soft_diffused_warm\",\n    \"master_seed_suggestion\": 4827159\n  }\n}\n\n═══════════════════════════════════════════════\nVALIDIERUNG (prüfe VOR dem Output)\n═══════════════════════════════════════════════\n\n□ JSON ist syntaktisch valid\n□ script enthält keine verbotenen Zeichen\n□ Wortanzahl ≈ (target_duration/60) × 150 (±20%)\n□ Alle image_prompts: 200-800 Zeichen, NUR was im Bild ist\n□ Alle motion_prompts: 80-300 Zeichen, NUR Bewegung\n□ KEIN motion_prompt enthält negative Formulierungen\n□ Kein Prompt enthält: Gesichter, Text im Bild, Logos\n□ Alle Scenes haben gleichen style_reference\n□ duration_hints summieren sich zu ≈ target_duration\n□ text_overlays: max 5 Wörter oder null\n□ total_scenes == scenes.length\n□ master_seed_suggestion ist ganzzahlig",
+          "maxTokens": 4096
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        -3104,
+        592
+      ],
+      "id": "68472013-4a53-4a5a-9474-6a01d96aa47d",
+      "name": "Claude worker",
+      "credentials": {
+        "anthropicApi": {
+          "id": "R8Bpqzln91cnI5Tv",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.elevenlabs.io/v1/text-to-speech/CVcPLXStXPeDxhrSflDZ",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "elevenLabsApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({\n  \"text\": $json.script,\n  \"model_id\": \"eleven_multilingual_v2\",\n  \"voice_settings\": {\n    \"stability\": $('Apply Channel Preset').first().json.preset.voice_stability,\n    \"similarity_boost\": $('Apply Channel Preset').first().json.preset.voice_similarity,\n    \"style\": 0,\n    \"use_speaker_boost\": true\n  }\n}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2528,
+        592
+      ],
+      "id": "5c3b60ae-a3fd-42c5-a9a0-177cbdd935fd",
+      "name": "ElevenLabs TTS with Timestamps",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "kjVYrldFpNfzJ2up",
+          "name": "Runway Bearer Auth account"
+        },
+        "elevenLabsApi": {
+          "id": "Z4VrOGa1xYLTo9sr",
+          "name": "ElevenLabs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "scenes",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -1408,
+        592
+      ],
+      "id": "5755670f-0a50-4316-a25b-13cbf47b4540",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.body.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "video"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        160,
+        616
+      ],
+      "id": "6180538d-dea0-4f75-87f0-7e5d2bb49453",
+      "name": "Download Creatomate Video"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "video",
+        "name": "={{ $('Input Validation').first().json.execution_id }}.mp4",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1RNAnPnNXyYbpQj8IJYdVQ5rC6_Bo4bFd",
+          "mode": "list",
+          "cachedResultName": "Video Automation",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1RNAnPnNXyYbpQj8IJYdVQ5rC6_Bo4bFd"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        384,
+        616
+      ],
+      "id": "83debd7f-8d24-48ff-b68a-9247f803868f",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "wyNBHfRkeutrmSys",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "676df309-da32-4704-8705-1f619ac9c44a",
+              "leftValue": "={{ $json.video_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9411e9bf-9096-4a6d-93b0-6bd4b6a7d997",
+      "name": "Video Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        160,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "id": "fe0a4d6a-754c-473a-8aa5-b198d4b0bf0d",
+      "name": "Wait Before Video Recheck",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        384,
+        184
+      ],
+      "webhookId": "4b63b060-749b-48fc-bee6-cb67748fb6eb"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "466c4fba-0d33-4f37-a6c0-94a73f622495",
+              "leftValue": "={{ $json.image_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "15bb4b86-4ec7-4af7-8e50-7c92b4adfaa5",
+      "name": "Image Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -512,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "id": "4a548b68-23d7-48aa-b722-7dff126beef9",
+      "name": "Wait Before Image Recheck",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -288,
+        400
+      ],
+      "webhookId": "8b4f7538-fc1e-4f04-9280-bc8bc2cdf222"
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Input Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input Validation": {
+      "main": [
+        [
+          {
+            "node": "Apply Channel Preset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Channel Preset": {
+      "main": [
+        [
+          {
+            "node": "Validation Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation Gate": {
+      "main": [
+        [
+          {
+            "node": "Claude worker",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Response 400",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Response Parser": {
+      "main": [
+        [
+          {
+            "node": "ElevenLabs TTS with Timestamps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ElevenLabs Timing Extraction": {
+      "main": [
+        [
+          {
+            "node": "Supabase Audio Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Audio Upload": {
+      "main": [
+        [
+          {
+            "node": "Build Audio URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Audio URL": {
+      "main": [
+        [
+          {
+            "node": "Calculate Scene Durations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Scene Durations": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scene Loop": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runway Text to Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runway Text to Image": {
+      "main": [
+        [
+          {
+            "node": "Poll Image Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Image Task": {
+      "main": [
+        [
+          {
+            "node": "Image Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runway Image to Video": {
+      "main": [
+        [
+          {
+            "node": "Poll Video Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Video Task": {
+      "main": [
+        [
+          {
+            "node": "Video Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Results": {
+      "main": [
+        [
+          {
+            "node": "Build Creatomate Modifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Creatomate Modifications": {
+      "main": [
+        [
+          {
+            "node": "Creatomate Render Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Creatomate Render Request": {
+      "main": [
+        [
+          {
+            "node": "Wait for Render Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Render Complete": {
+      "main": [
+        [
+          {
+            "node": "Success Response 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success Response 200": {
+      "main": [
+        [
+          {
+            "node": "Download Creatomate Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Log Error to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Error to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Error Response 500",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude worker": {
+      "main": [
+        [
+          {
+            "node": "Claude Response Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ElevenLabs TTS with Timestamps": {
+      "main": [
+        [
+          {
+            "node": "ElevenLabs Timing Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Scene Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Creatomate Video": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Ready?": {
+      "main": [
+        [
+          {
+            "node": "Scene Loop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Before Video Recheck",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Before Video Recheck": {
+      "main": [
+        [
+          {
+            "node": "Poll Video Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Ready?": {
+      "main": [
+        [
+          {
+            "node": "Runway Image to Video",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Before Image Recheck",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Before Image Recheck": {
+      "main": [
+        [
+          {
+            "node": "Poll Image Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "c4b20595f230d613d9fcce7c853b7a7e3b4da29f9372a38cfd904a8214fcd864"
+  }
+}
