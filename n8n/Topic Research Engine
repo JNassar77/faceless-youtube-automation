@@ -1,0 +1,415 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Daten können von Webhook (.body) oder Execute Workflow (direkt) kommen\nconst rawInput = $input.first().json;\nconst input = rawInput.body || rawInput; // Automatische Erkennung!\n\nconst errors = [];\n\nif (!input.topic || input.topic.length < 5) {\n  errors.push({ field: \"topic\", message: \"Topic must be at least 5 chars\" });\n}\n\nconst validChannels = [\"hausarzt\", \"aesthetik\", \"ki\"];\nconst channel = (input.channel || \"\").toLowerCase();\nif (!validChannels.includes(channel)) {\n  errors.push({ field: \"channel\", message: \"Must be: \" + validChannels.join(\", \") });\n}\n\nif (errors.length > 0) {\n  return { json: { valid: false, errors } };\n}\n\nconst cacheKey = `${channel}_${input.topic.toLowerCase().replace(/[^a-z0-9äöüß]/g, '_').substring(0, 100)}`;\n\nreturn {\n  json: {\n    valid: true,\n    topic: input.topic.trim(),\n    channel: channel,\n    target_audience: input.target_audience || \"Deutschsprachige Zuschauer\",\n    cache_key: cacheKey,\n    execution_id: $execution.id\n  }\n};"
+      },
+      "id": "77b30d6e-6066-4e84-84de-bea85293fedc",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1120,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "be1b7324-6e4b-4b2c-9e67-c237ec56bbd9",
+      "name": "Validation Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"error\", \"errors\": {{ JSON.stringify($json.errors) }} }",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "9ad8fa3e-72fb-4dfa-a88e-f7f3da496f71",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -672,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://ywdwvjriklaevktswnwe.supabase.co/rest/v1/rpc/get_valid_research",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"p_cache_key\": \"{{ $json.cache_key }}\"\n}",
+        "options": {
+          "response": {
+            "response": {}
+          }
+        }
+      },
+      "id": "fbb5b395-8085-4948-8ec1-e08f82233429",
+      "name": "Check Supabase Cache",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -672,
+        160
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "f8iz392lw94fjHLf",
+          "name": "Supabase NovaCoreDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ \n  Array.isArray($json) \n  ? $json.length > 0 \n  : false \n}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "id": "59963f07-4032-41ac-b07e-aaea1516691d"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8201a666-56b4-428f-a4e9-e7def7dd9dc3",
+      "name": "Cache Hit?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cachedData = $input.first().json[0];\nconst validatedInput = $('Validate Input').first().json;\n\nreturn {\n  json: {\n    status: \"cache_hit\",\n    cache_key: validatedInput.cache_key,\n    research_data: cachedData.research_data,\n    cached_at: cachedData.created_at,\n    sources: cachedData.sources || []\n  }\n};"
+      },
+      "id": "a584390c-c0a7-4fcf-a12c-3ef4015fc8a6",
+      "name": "Return Cached Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $('Validate Input').first().json;\n\nconst CHANNEL_CONTEXT = {\n  hausarzt: {\n    focus: \"Medizinische Korrektheit, Patientenverständlichkeit, evidenzbasierte Informationen\",\n    avoid: \"Reißerische Heilversprechen, komplizierte Fachsprache ohne Erklärung\"\n  },\n  aesthetik: {\n    focus: \"Aktuelle Trends, Behandlungsmethoden, realistische Erwartungen, Sicherheit\",\n    avoid: \"Übertriebene Vorher-Nachher-Versprechen, unseriöse Wundermittel\"\n  },\n  ki: {\n    focus: \"Praktische Anwendungen, technische Grundlagen verständlich erklärt, Business Impact\",\n    avoid: \"Übertriebene Hype-Sprache, unrealistische Zukunftsszenarien\"\n  }\n};\n\nconst context = CHANNEL_CONTEXT[input.channel];\n\nconst prompt = `Du bist ein Research-Spezialist für hochwertige YouTube-Content-Produktion.\n\nTHEMA: ${input.topic}\nKANAL-KONTEXT: ${input.channel}\nZIELGRUPPE: ${input.target_audience}\n\nFOKUS: ${context.focus}\nVERMEIDE: ${context.avoid}\n\nRecherchiere folgende Aspekte und gib die Antwort als valides JSON zurück:\n\n1. **trends**: Array mit 3-5 aktuellen Entwicklungen/Trends zum Thema (jeweils 1-2 Sätze)\n2. **facts**: Array mit 5-8 wichtigen Fakten & Zahlen (mit Quellenangabe wenn verfügbar)\n3. **misconceptions**: Array mit 2-4 häufigen Missverständnissen zum Thema\n4. **visual_concepts**: Array mit 4-6 visuellen Schlüsselkonzepten die man zeigen sollte (z.B. \"Nahaufnahme einer Spritze\", \"Haut-Textur unter dem Mikroskop\")\n5. **emotional_hooks**: Array mit 2-3 emotionalen Aufhängern die das Thema spannend machen\n6. **key_message**: Ein Satz der die Kernbotschaft zusammenfasst\n\nACHTUNG: Antworte NUR mit dem JSON-Objekt, KEIN zusätzlicher Text, KEINE Markdown-Code-Blöcke.\n\nJSON-Schema:\n{\n  \"trends\": [\"string\"],\n  \"facts\": [\"string\"],\n  \"misconceptions\": [\"string\"],\n  \"visual_concepts\": [\"string\"],\n  \"emotional_hooks\": [\"string\"],\n  \"key_message\": \"string\"\n}`;\n\nreturn { json: { prompt } };"
+      },
+      "id": "db5b3ea2-544c-4456-9e06-7874156199cb",
+      "name": "Build Perplexity Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.perplexity.ai/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "perplexityApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"model\": \"sonar\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify($json.prompt) }}\n    }\n  ],\n  \"temperature\": 0.2,\n  \"return_citations\": true,\n  \"search_recency_filter\": \"month\"\n}",
+        "options": {}
+      },
+      "id": "3817ad47-781d-40f5-9387-ac9145bc23b5",
+      "name": "Perplexity API Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        256
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "kjVYrldFpNfzJ2up",
+          "name": "Runway Bearer Auth account"
+        },
+        "perplexityApi": {
+          "id": "yCAaRt6AiN17wDlu",
+          "name": "Perplexity account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst validatedInput = $('Validate Input').first().json;\n\nlet researchData;\nconst rawContent = response.choices[0].message.content;\n\ntry {\n  researchData = JSON.parse(rawContent);\n} catch (e) {\n  const match = rawContent.match(/```json?\\s*([\\s\\S]*?)```/);\n  if (match) {\n    researchData = JSON.parse(match[1]);\n  } else {\n    throw new Error(\"Perplexity returned invalid JSON: \" + rawContent.substring(0, 200));\n  }\n}\n\nconst sources = response.citations || [];\n\nreturn {\n  json: {\n    cache_key: validatedInput.cache_key,\n    channel: validatedInput.channel,\n    topic: validatedInput.topic,\n    research_data: researchData,\n    sources: sources,\n    execution_id: validatedInput.execution_id\n  }\n};"
+      },
+      "id": "64f97f41-5bbf-424f-9fac-4efbc176cbb1",
+      "name": "Parse Research Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://ywdwvjriklaevktswnwe.supabase.co/rest/v1/topic_research",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"cache_key\": \"{{ $json.cache_key }}\",\n  \"channel\": \"{{ $json.channel }}\",\n  \"topic\": \"{{ $json.topic }}\",\n  \"research_data\": {{ JSON.stringify($json.research_data) }},\n  \"sources\": {{ JSON.stringify($json.sources) }}\n}",
+        "options": {}
+      },
+      "id": "9d54bf66-97e8-49d0-840e-62f09b583ee6",
+      "name": "Save to Supabase Cache",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        448,
+        256
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "f8iz392lw94fjHLf",
+          "name": "Supabase NovaCoreDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "topic"
+            },
+            {
+              "name": "channel"
+            },
+            {
+              "name": "target_audience"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1344,
+        256
+      ],
+      "id": "e3aface3-b3b2-4bf1-beb0-c690ef7675b2",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Wir holen die Daten vom Node \"Parse Research Data\", \n// da dort noch alles vollständig vorhanden ist.\nconst data = $('Parse Research Data').first().json;\n\nreturn {\n  json: {\n    topic: data.topic,\n    channel: data.channel,\n    // Hier stecken deine Trends, Facts, etc. drin (siehe Screenshot)\n    research_data: data.research_data,\n    sources: data.sources || [],\n    cache_key: data.cache_key\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        256
+      ],
+      "id": "7c8d2167-e155-40e8-9bb1-0cdd519d2a84",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "connections": {
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Validation Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation Gate": {
+      "main": [
+        [
+          {
+            "node": "Check Supabase Cache",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Supabase Cache": {
+      "main": [
+        [
+          {
+            "node": "Cache Hit?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cache Hit?": {
+      "main": [
+        [
+          {
+            "node": "Return Cached Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Perplexity Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Cached Data": {
+      "main": [
+        []
+      ]
+    },
+    "Build Perplexity Prompt": {
+      "main": [
+        [
+          {
+            "node": "Perplexity API Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perplexity API Call": {
+      "main": [
+        [
+          {
+            "node": "Parse Research Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Research Data": {
+      "main": [
+        [
+          {
+            "node": "Save to Supabase Cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Supabase Cache": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "c4b20595f230d613d9fcce7c853b7a7e3b4da29f9372a38cfd904a8214fcd864"
+  }
+}
