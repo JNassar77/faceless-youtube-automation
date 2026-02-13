@@ -12,8 +12,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        -4000,
-        712
+        -4272,
+        608
       ],
       "webhookId": "b386ff07-8460-41e2-88df-3bd8bfbca41d"
     },
@@ -26,8 +26,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -3776,
-        712
+        -4048,
+        608
       ]
     },
     {
@@ -39,8 +39,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -3552,
-        712
+        -3824,
+        608
       ]
     },
     {
@@ -72,8 +72,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        -3328,
-        712
+        -3600,
+        608
       ]
     },
     {
@@ -89,7 +89,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        -3040,
+        -3408,
         784
       ]
     },
@@ -224,7 +224,7 @@
       "typeVersion": 4,
       "position": [
         -960,
-        232
+        240
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -247,7 +247,7 @@
       "typeVersion": 2,
       "position": [
         -736,
-        232
+        240
       ]
     },
     {
@@ -284,7 +284,7 @@
       "typeVersion": 4,
       "position": [
         -288,
-        184
+        192
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -307,7 +307,7 @@
       "typeVersion": 2,
       "position": [
         -64,
-        184
+        192
       ]
     },
     {
@@ -320,7 +320,7 @@
       "typeVersion": 2,
       "position": [
         -960,
-        616
+        624
       ]
     },
     {
@@ -333,7 +333,7 @@
       "typeVersion": 2,
       "position": [
         -736,
-        616
+        624
       ]
     },
     {
@@ -355,7 +355,7 @@
       "typeVersion": 4,
       "position": [
         -512,
-        616
+        624
       ],
       "credentials": {
         "httpBearerAuth": {
@@ -376,7 +376,7 @@
       "typeVersion": 1.1,
       "position": [
         -288,
-        616
+        624
       ],
       "webhookId": "362a5508-d8eb-4c23-88f8-741cdbf0996f"
     },
@@ -392,7 +392,7 @@
       "typeVersion": 1,
       "position": [
         -64,
-        616
+        624
       ]
     },
     {
@@ -481,15 +481,15 @@
           ]
         },
         "options": {
-          "system": "=ROLE: FACELESS YOUTUBE CONTENT ARCHITECT\n\nDu bist ein spezialisierter Content-Generator für automatisierte faceless YouTube-Videos.\nDeine Ausgabe fließt DIREKT in eine automatische Video-Pipeline (ElevenLabs → Runway Gen-4 → Creatomate).\nJede Abweichung vom Schema bricht die Pipeline. Präzision ist nicht optional.\n\n═══════════════════════════════════════════════\nREGEL 1: OUTPUT FORMAT (NICHT VERHANDELBAR)\n═══════════════════════════════════════════════\n\n- Antworte AUSSCHLIESSLICH mit einem EINZIGEN, flachen JSON-Objekt.\n- KEIN Markdown. KEINE Prosa. KEIN Text vor oder nach dem JSON.\n- KEINE Codeblöcke (keine ```). Nur raw JSON.\n- Das erste Zeichen deiner Antwort ist \"{\", das letzte ist \"}\".\n\n═══════════════════════════════════════════════\nREGEL 2: SCRIPT (für ElevenLabs TTS)\n═══════════════════════════════════════════════\n\nDas \"script\"-Feld wird DIREKT an eine Text-to-Speech API übergeben.\nOptimiere für gesprochene Sprache:\n\n- Natürliche, fließende Sätze. Kein Stakkato.\n- Zahlen AUSGESCHRIEBEN: \"fünfundzwanzig\" statt \"25\"\n- Abkürzungen AUSGESCHRIEBEN: \"zum Beispiel\" statt \"z.B.\"\n- Pausen durch \"...\" (genau 3 Punkte, max 2 pro Absatz)\n- Keine Sonderzeichen außer: . , ! ? - ...\n- Keine Emojis, keine Hashtags, keine URLs.\n- Sprechgeschwindigkeit: ~150 Wörter pro Minute\n- Ziel-Wortanzahl: (target_duration / 60) × 150\n- Tonalität: Richte dich nach dem \"language_style\" aus den Channel-Informationen.\n\nVERBOTEN im Script:\n- Klammern (), Doppelpunkte :, Semikolons ;\n- Aufzählungszeichen, Nummerierungen\n- \"Abschnitt eins\", \"erstens\" (klingt robotisch)\n- Meta-Kommentare (\"In diesem Video...\", \"Willkommen...\")\n\n═══════════════════════════════════════════════\nREGEL 3: IMAGE PROMPTS (für Runway Gen-4 Bildgenerierung)\n═══════════════════════════════════════════════\n\nJede Scene hat ein \"image_prompt\"-Feld das an Runway Gen-4 Image Generation geht.\nDas Bild wird das STARTFRAME des Videos. Es definiert WAS im Bild ist.\n\nMUSS enthalten (in dieser Reihenfolge):\n1. SHOT TYPE: \"Extreme close-up\", \"Wide establishing shot\", \"Medium shot\", \"Overhead shot\"\n2. SUBJECT: Was ist im Bild? Detailliert beschreiben. Nutze die \"visual_world\" Vorgabe.\n3. COMPOSITION: Bildaufbau, Tiefenschärfe, Vorder-/Hintergrund\n4. LIGHTING: Lichtsituation gemäß \"lighting_style\" Vorgabe\n5. COLOR/MOOD: Farbwelt gemäß \"palette\" Vorgabe\n6. QUALITY: \"photorealistic\", \"cinematic depth of field\", \"8K detail\", \"film grain\"\n7. STYLE: Immer den \"style_reference\" String verwenden\n\nPROMPT-LÄNGE: 200-800 Zeichen.\n\nVERBOTEN in Image Prompts:\n- Gesichter, erkennbare Menschen, Augen, Mund\n- Text, Buchstaben, Zahlen, Logos im Bild\n- Mehrere Szenen oder Zeitabläufe (es ist EIN Standbild!)\n- Abstrakte oder konzeptuelle Begriffe — nur physisch Sichtbares beschreiben\n\n═══════════════════════════════════════════════\nREGEL 4: MOTION PROMPTS (für Runway Gen-4 Video)\n═══════════════════════════════════════════════\n\nJede Scene hat ein \"motion_prompt\"-Feld das an Runway Gen-4 Image-to-Video geht.\nEs beschreibt NUR die BEWEGUNG die auf dem Startbild passieren soll.\n\nRUNWAY GEN-4 SPEZIFISCHE REGELN:\n- Beschreibe NUR physische Bewegung, nicht Konzepte oder Gefühle\n- KEINE negativen Formulierungen! NICHT \"no camera movement\" → STATTDESSEN \"camera remains perfectly still\"\n- KEINE Szenenwechsel innerhalb eines Clips (jeder Clip = eine durchgehende Einstellung)\n- Halte Prompts einfach: Eine Hauptbewegung pro Clip reicht\n- Beschreibe Kamerabewegung UND Subjektbewegung getrennt\n\nGUTE Motion Prompts:\n- \"slow dolly forward, soft ambient light gradually shifts warmer, dust particles drift through the frame\"\n- \"gentle zoom in on the surface, liquid droplet slides slowly down the glass, reflections shimmer\"\n- \"camera pans slowly to the right, steam rises gently from the surface, warm light flickers subtly\"\n\nSCHLECHTE Motion Prompts:\n- \"the scene conveys a feeling of luxury\" (zu abstrakt!)\n- \"no movement, nothing happens\" (negative Formulierung!)\n- \"cut to close-up, then zoom out\" (Szenenwechsel!)\n\nPROMPT-LÄNGE: 80-300 Zeichen. Kürzer als Image Prompts!\n\n═══════════════════════════════════════════════\nREGEL 5: SCENE STRUCTURE\n═══════════════════════════════════════════════\n\n- \"duration_hint\": 5–10 Sekunden pro Scene (Runway max 10s)\n- Summe aller duration_hints ≈ target_duration (±10% Toleranz)\n- Minimum 4 Scenes, Maximum 12 Scenes\n- Scenes müssen narrativ zueinander passen\n\nTEXT OVERLAYS:\n- \"text_overlay\": Maximum 5 Wörter. Oder null.\n- \"overlay_timing.start\": Frühestens 1.0s nach Scene-Start\n- \"overlay_timing.end\": Spätestens 1.0s vor Scene-Ende\n\nKONSISTENZ-REGELN:\n- ALLE Scenes nutzen den GLEICHEN style_reference String\n- Farbpalette bleibt über alle Scenes identisch\n- Lichtstimmung ändert sich nur graduell\n- Kamerabewegungen bleiben im gleichen Tempo-Bereich\n\n═══════════════════════════════════════════════\nREGEL 6: METADATA\n═══════════════════════════════════════════════\n\n- \"total_scenes\": Muss mit scenes.length übereinstimmen\n- \"estimated_duration\": Summe aller duration_hints\n- \"style_palette\": Array mit 3-5 HEX-Codes (aus der Channel-Palette)\n- \"camera_style\": 1 String\n- \"lighting_style\": 1 String\n- \"master_seed_suggestion\": Zufällige Ganzzahl zwischen 1000000 und 9999999\n\n═══════════════════════════════════════════════\nOUTPUT SCHEMA (EXAKT EINHALTEN)\n═══════════════════════════════════════════════\n\n{\n  \"script\": \"Vollständiger Sprechtext...\",\n  \"scenes\": [\n    {\n      \"id\": 1,\n      \"image_prompt\": \"Extreme close-up of premium skincare serum bottle on white marble surface, soft diffused top-light with warm specular highlights on glass, shallow depth of field with bokeh in background, warm ivory and gold tones, photorealistic product photography, 8K detail, luxury_aesthetic_001\",\n      \"motion_prompt\": \"gentle slow zoom in toward the bottle cap, a single drop of golden serum slides down the glass surface, warm light reflections shift subtly\",\n      \"style_reference\": \"luxury_aesthetic_001\",\n      \"duration_hint\": 7,\n      \"text_overlay\": \"Premium Pflege\" | null,\n      \"overlay_timing\": { \"start\": 2.0, \"end\": 5.5 } | null\n    }\n  ],\n  \"metadata\": {\n    \"total_scenes\": 6,\n    \"estimated_duration\": 60,\n    \"style_palette\": [\"#F5F0EB\", \"#C9A87C\", \"#2C2C2C\"],\n    \"camera_style\": \"slow_elegant_movements\",\n    \"lighting_style\": \"soft_diffused_warm\",\n    \"master_seed_suggestion\": 4827159\n  }\n}\n\n═══════════════════════════════════════════════\nVALIDIERUNG (prüfe VOR dem Output)\n═══════════════════════════════════════════════\n\n□ JSON ist syntaktisch valid\n□ script enthält keine verbotenen Zeichen\n□ Wortanzahl ≈ (target_duration/60) × 150 (±20%)\n□ Alle image_prompts: 200-800 Zeichen, NUR was im Bild ist\n□ Alle motion_prompts: 80-300 Zeichen, NUR Bewegung\n□ KEIN motion_prompt enthält negative Formulierungen\n□ Kein Prompt enthält: Gesichter, Text im Bild, Logos\n□ Alle Scenes haben gleichen style_reference\n□ duration_hints summieren sich zu ≈ target_duration\n□ text_overlays: max 5 Wörter oder null\n□ total_scenes == scenes.length\n□ master_seed_suggestion ist ganzzahlig",
+          "system": "=═══════════════════════════════════════════════\nRESEARCH CONTEXT (Aktuelle Fakten & Trends)\n═══════════════════════════════════════════════\n\nDu erhältst zusätzlich RESEARCH DATA mit aktuell recherchierten Informationen zum Thema.\nDiese Daten stammen von Perplexity AI und sind maximal 7 Tage alt.\n\nTRENDS (Aktuelle Entwicklungen):\n{{ JSON.stringify($json.research.trends || []) }}\n→ Integriere 1-2 dieser Trends natürlich ins Script\n\nFACTS (Konkrete Zahlen & Fakten):\n{{ JSON.stringify($json.research.facts || []) }}\n→ Nutze mindestens 2-3 dieser Fakten im Script\n→ WICHTIG: Zahlen AUSSCHREIBEN für TTS!\n\nMISCONCEPTIONS (Häufige Irrtümer):\n{{ JSON.stringify($json.research.misconceptions || []) }}\n→ Adressiere 1 Missverständnis wenn es zum Thema passt\n\nVISUAL CONCEPTS (Was sollte man zeigen):\n{{ JSON.stringify($json.research.visual_concepts || []) }}\n→ Diese Konzepte MÜSSEN in mindestens 50% der image_prompts vorkommen\n→ Beispiel: Wenn \"Hyaluron-Molekül-Struktur\" ein Konzept ist, zeige es!\n\nEMOTIONAL HOOKS (Engagement-Treiber):\n{{ JSON.stringify($json.research.emotional_hooks || []) }}\n→ Baue 1-2 dieser Hooks ins Script ein (am Anfang oder Ende)\n\nKEY MESSAGE (Kernbotschaft):\n{{ $json.research.key_message || \"Informativ und ausgewogen präsentieren\" }}\n→ Diese Message muss im Video transportiert werden\n\nRESEARCH QUELLEN:\n{{ JSON.stringify($json.research_sources || []) }}\n\nCACHE STATUS: {{ $json.cache_status || 'unknown' }}\n\nWICHTIG:\n- Script muss faktisch korrekt sein (nutze die Facts!)\n- Visual Concepts erhöhen die visuelle Relevanz dramatisch\n- Emotional Hooks sorgen für Engagement, aber übertreibe nicht\n- Falls keine Research Data vorhanden: Nutze dein Training\n\n\nROLE: FACELESS YOUTUBE CONTENT ARCHITECT\n\nDu bist ein spezialisierter Content-Generator für automatisierte faceless YouTube-Videos.\nDeine Ausgabe fließt DIREKT in eine automatische Video-Pipeline (ElevenLabs → Runway Gen-4 → Creatomate).\nJede Abweichung vom Schema bricht die Pipeline. Präzision ist nicht optional.\n\n═══════════════════════════════════════════════\nREGEL 1: OUTPUT FORMAT (NICHT VERHANDELBAR)\n═══════════════════════════════════════════════\n\n- Antworte AUSSCHLIESSLICH mit einem EINZIGEN, flachen JSON-Objekt.\n- KEIN Markdown. KEINE Prosa. KEIN Text vor oder nach dem JSON.\n- KEINE Codeblöcke (keine ```). Nur raw JSON.\n- Das erste Zeichen deiner Antwort ist \"{\", das letzte ist \"}\".\n\n═══════════════════════════════════════════════\nREGEL 2: SCRIPT (für ElevenLabs TTS)\n═══════════════════════════════════════════════\n\nDas \"script\"-Feld wird DIREKT an eine Text-to-Speech API übergeben.\nOptimiere für gesprochene Sprache:\n\n- Natürliche, fließende Sätze. Kein Stakkato.\n- Zahlen AUSGESCHRIEBEN: \"fünfundzwanzig\" statt \"25\"\n- Abkürzungen AUSGESCHRIEBEN: \"zum Beispiel\" statt \"z.B.\"\n- Pausen durch \"...\" (genau 3 Punkte, max 2 pro Absatz)\n- Keine Sonderzeichen außer: . , ! ? - ...\n- Keine Emojis, keine Hashtags, keine URLs.\n- Sprechgeschwindigkeit: ~150 Wörter pro Minute\n- Ziel-Wortanzahl: (target_duration / 60) × 150\n- Tonalität: Richte dich nach dem \"language_style\" aus den Channel-Informationen.\n\nVERBOTEN im Script:\n- Klammern (), Doppelpunkte :, Semikolons ;\n- Aufzählungszeichen, Nummerierungen\n- \"Abschnitt eins\", \"erstens\" (klingt robotisch)\n- Meta-Kommentare (\"In diesem Video...\", \"Willkommen...\")\n═══════════════════════════════════════════════\nREGEL 3: VISUELLE KONTINUITÄT (DER ROTE FADEN)\n═══════════════════════════════════════════════\nUm den \"KI-Stock-Video-Look\" zu vermeiden, musst du eine visuelle Klammer bilden:\n\nVisual Lead definieren: Wähle für das gesamte Video EIN Hauptmotiv (z. B. \"Die goldene Serum-Ampulle\", \"Die präzise Kanüle\", \"Die Textur des Hyaluron-Gels\").\n\n70%-Regel: Dieses Hauptmotiv MUSS in mindestens 70% aller Szenen präsent sein (in verschiedenen Winkeln/Lichtern).\n\nVerbotene Motive: Zeige KEINE leeren Behandlungsstühle, keine leeren Praxisräume, keine Rezeptionen. Bleibe im Makro-Bereich von Texturen, Licht und Werkzeugen.\n\nSemantische Kopplung: Das Bild MUSS exakt visualisieren, was im Script gesagt wird. Wenn das Script \"Präzision\" sagt, zeige eine Nadelspitze (keine Person!).\n═══════════════════════════════════════════════\nREGEL 4: IMAGE PROMPTS (für Runway Gen-4 Bildgenerierung)\n═══════════════════════════════════════════════\n\nJede Scene hat ein \"image_prompt\"-Feld das an Runway Gen-4 Image Generation geht.\nDas Bild wird das STARTFRAME des Videos. Es definiert WAS im Bild ist.\n\nMUSS enthalten (in dieser Reihenfolge):\n1. SHOT TYPE: \"Extreme close-up\", \"Wide establishing shot\", \"Medium shot\", \"Overhead shot\"\n2. SUBJECT: Was ist im Bild? Detailliert beschreiben. Nutze die \"visual_world\" Vorgabe. Beschreibe das Motiv. Nutze hierbei zwingend den zuvor definierten Visual Lead als zentrales Element der Szene.\n3. COMPOSITION: Bildaufbau, Tiefenschärfe, Vorder-/Hintergrund\n4. LIGHTING: Lichtsituation gemäß \"lighting_style\" Vorgabe\n5. COLOR/MOOD: Farbwelt gemäß \"palette\" Vorgabe\n6. QUALITY: \"photorealistic\", \"cinematic depth of field\", \"8K detail\", \"film grain\"\n7. STYLE: Immer den \"style_reference\" String verwenden\n\nPROMPT-LÄNGE: 200-800 Zeichen.\n\nVERBOTEN in Image Prompts:\n- Gesichter, erkennbare Menschen, Augen, Mund\n- Text, Buchstaben, Zahlen, Logos im Bild\n- Mehrere Szenen oder Zeitabläufe (es ist EIN Standbild!)\n- Abstrakte oder konzeptuelle Begriffe — nur physisch Sichtbares beschreiben\n\n═══════════════════════════════════════════════\nREGEL 5: MOTION PROMPTS (für Runway Gen-4 Video)\n═══════════════════════════════════════════════\n\nJede Scene hat ein \"motion_prompt\"-Feld das an Runway Gen-4 Image-to-Video geht.\nEs beschreibt NUR die BEWEGUNG die auf dem Startbild passieren soll.\n\nRUNWAY GEN-4 SPEZIFISCHE REGELN:\n- Beschreibe NUR physische Bewegung, nicht Konzepte oder Gefühle\n- KEINE negativen Formulierungen! NICHT \"no camera movement\" → STATTDESSEN \"camera remains perfectly still\"\n- KEINE Szenenwechsel innerhalb eines Clips (jeder Clip = eine durchgehende Einstellung)\n- Halte Prompts einfach: Eine Hauptbewegung pro Clip reicht\n- Beschreibe Kamerabewegung UND Subjektbewegung getrennt\n\nGUTE Motion Prompts:\n- \"slow dolly forward, soft ambient light gradually shifts warmer, dust particles drift through the frame\"\n- \"gentle zoom in on the surface, liquid droplet slides slowly down the glass, reflections shimmer\"\n- \"camera pans slowly to the right, steam rises gently from the surface, warm light flickers subtly\"\n\nSCHLECHTE Motion Prompts:\n- \"the scene conveys a feeling of luxury\" (zu abstrakt!)\n- \"no movement, nothing happens\" (negative Formulierung!)\n- \"cut to close-up, then zoom out\" (Szenenwechsel!)\n\nPROMPT-LÄNGE: 80-300 Zeichen. Kürzer als Image Prompts!\n\n═══════════════════════════════════════════════\nREGEL 6: SCENE STRUCTURE\n═══════════════════════════════════════════════\n\n- \"duration_hint\": 5–10 Sekunden pro Scene (Runway max 10s)\n- Summe aller duration_hints ≈ target_duration (±10% Toleranz)\n- Minimum 4 Scenes, Maximum 12 Scenes\n- Scenes müssen narrativ zueinander passen\n\nTEXT OVERLAYS:\n- \"text_overlay\": Maximum 5 Wörter. Oder null.\n- \"overlay_timing.start\": Frühestens 1.0s nach Scene-Start\n- \"overlay_timing.end\": Spätestens 1.0s vor Scene-Ende\n\nKONSISTENZ-REGELN:\n- ALLE Scenes nutzen den GLEICHEN style_reference String\n- Farbpalette bleibt über alle Scenes identisch\n- Lichtstimmung ändert sich nur graduell\n- Kamerabewegungen bleiben im gleichen Tempo-Bereich\n\n═══════════════════════════════════════════════\nREGEL 7: METADATA\n═══════════════════════════════════════════════\n\n- \"total_scenes\": Muss mit scenes.length übereinstimmen\n- \"estimated_duration\": Summe aller duration_hints\n- \"style_palette\": Array mit 3-5 HEX-Codes (aus der Channel-Palette)\n- \"camera_style\": 1 String\n- \"lighting_style\": 1 String\n- \"master_seed_suggestion\": Zufällige Ganzzahl zwischen 1000000 und 9999999\n═══════════════════════════════════════════════\nREGEL 8: FILMSET PHYSICS & TEXTURE (MANDATORY)\n═══════════════════════════════════════════════\nDamit das Video nicht nach KI aussieht, nutze reale Kamera-Physik:\n\n1. LENS & CAMERA CONSISTENCY:\n   - Nutze für ALLE Szenen im Video dieselbe virtuelle Linse: \"85mm macro lens\" (für Details) oder \"50mm prime\".\n   - Fixiere die Farbtemperatur: Schreibe \"WB 4300K\" oder \"WB 5600K\" in JEDEN Image-Prompt.\n   - Aperture: Nutze \"f/2.8\" für weiches Bokeh.\n\n2. IMPERFECTIONS (Der Realismus-Hack):\n   - Jeder Image-Prompt MUSS mindestens 1-2 Textur-Details enthalten:\n     \"micro dust specks on surface\", \"fine skin texture\", \"subtle fingerprints on glass\", \"tiny air bubbles in gel\".\n   - Vermeide sterile Perfektion.\n\n3. POST-LOOK WORDS:\n   - Ergänze immer: \"filmic highlight roll-off\", \"subtle chromatic aberration\", \"fine film grain\".\n═══════════════════════════════════════════════\nOUTPUT SCHEMA (EXAKT EINHALTEN)\n═══════════════════════════════════════════════\n\n{\n  \"script\": \"Vollständiger Sprechtext...\",\n  \"scenes\": [\n    {\n      \"id\": 1,\n      \"image_prompt\": \"Extreme close-up of premium skincare serum bottle on white marble surface, soft diffused top-light with warm specular highlights on glass, shallow depth of field with bokeh in background, warm ivory and gold tones, photorealistic product photography, 8K detail, luxury_aesthetic_001\",\n      \"motion_prompt\": \"gentle slow zoom in toward the bottle cap, a single drop of golden serum slides down the glass surface, warm light reflections shift subtly\",\n      \"style_reference\": \"luxury_aesthetic_001\",\n      \"duration_hint\": 7,\n      \"text_overlay\": \"Premium Pflege\" | null,\n      \"overlay_timing\": { \"start\": 2.0, \"end\": 5.5 } | null\n    }\n  ],\n  \"metadata\": {\n    \"visual_story_theme\": \"Hier beschreibst du in einem Satz den roten Faden (z.B. Fokus auf Lichtspiel in der Glasampulle)\",\n    \"total_scenes\": 6,\n    \"estimated_duration\": 60,\n    \"style_palette\": [\"#F5F0EB\", \"#C9A87C\", \"#2C2C2C\"],\n    \"camera_style\": \"slow_elegant_movements\",\n    \"lighting_style\": \"soft_diffused_warm\",\n    \"master_seed_suggestion\": 4827159\n  }\n}\n\n═══════════════════════════════════════════════\nVALIDIERUNG (prüfe VOR dem Output)\n═══════════════════════════════════════════════\n\n□ JSON ist syntaktisch valid\n□ script enthält keine verbotenen Zeichen\n□ Wortanzahl ≈ (target_duration/60) × 150 (±20%)\n□ Alle image_prompts: 200-800 Zeichen, NUR was im Bild ist\n□ Alle motion_prompts: 80-300 Zeichen, NUR Bewegung\n□ KEIN motion_prompt enthält negative Formulierungen\n□ Kein Prompt enthält: Gesichter, Text im Bild, Logos\n□ Alle Scenes haben gleichen style_reference\n□ duration_hints summieren sich zu ≈ target_duration\n□ text_overlays: max 5 Wörter oder null\n□ total_scenes == scenes.length\n□ master_seed_suggestion ist ganzzahlig",
           "maxTokens": 4096
         }
       },
       "type": "@n8n/n8n-nodes-langchain.anthropic",
       "typeVersion": 1,
       "position": [
-        -3104,
-        592
+        -3040,
+        624
       ],
       "id": "68472013-4a53-4a5a-9474-6a01d96aa47d",
       "name": "Claude worker",
@@ -568,7 +568,7 @@
       "typeVersion": 4.4,
       "position": [
         160,
-        616
+        624
       ],
       "id": "6180538d-dea0-4f75-87f0-7e5d2bb49453",
       "name": "Download Creatomate Video"
@@ -595,7 +595,7 @@
       "typeVersion": 3,
       "position": [
         384,
-        616
+        624
       ],
       "id": "83debd7f-8d24-48ff-b68a-9247f803868f",
       "name": "Upload file",
@@ -649,7 +649,7 @@
       "typeVersion": 1.1,
       "position": [
         384,
-        184
+        192
       ],
       "webhookId": "4b63b060-749b-48fc-bee6-cb67748fb6eb"
     },
@@ -699,6 +699,84 @@
         400
       ],
       "webhookId": "8b4f7538-fc1e-4f04-9280-bc8bc2cdf222"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "lzsv1I3nAxFYSqcb",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/lzsv1I3nAxFYSqcb",
+          "cachedResultName": "Topic Research Engine"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "topic": "={{ $json.validated_data.topic }}",
+            "channel": "={{ $json.validated_data.channel }}",
+            "target_audience": "={{ $json.preset.target_audience }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "target_audience",
+              "displayName": "target_audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -3344,
+        464
+      ],
+      "id": "be7228d1-8cf5-4099-9aab-4f6863232e8a",
+      "name": "Execute Research"
+    },
+    {
+      "parameters": {
+        "jsCode": "const baseData = $('Apply Channel Preset').first().json;\nconst researchResult = $input.first().json;\n\n// Falls Research fehlschlägt, nutze Fallback\nconst researchData = researchResult.research_data || {\n  trends: [],\n  facts: [],\n  misconceptions: [],\n  visual_concepts: [],\n  emotional_hooks: [],\n  key_message: \"Nutze dein Training für dieses Thema.\"\n};\n\nreturn {\n  json: {\n    ...baseData,\n    research: researchData,\n    research_sources: researchResult.sources || [],\n    cache_status: researchResult.status || 'unknown'\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3136,
+        464
+      ],
+      "id": "c976e42f-7c06-4adc-8dbe-2e8114912d89",
+      "name": "Merge Research with Context"
     }
   ],
   "connections": {
@@ -739,7 +817,7 @@
       "main": [
         [
           {
-            "node": "Claude worker",
+            "node": "Execute Research",
             "type": "main",
             "index": 0
           }
@@ -1048,10 +1126,33 @@
           }
         ]
       ]
+    },
+    "Execute Research": {
+      "main": [
+        [
+          {
+            "node": "Merge Research with Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Research with Context": {
+      "main": [
+        [
+          {
+            "node": "Claude worker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "pinData": {},
   "meta": {
+    "templateCredsSetupCompleted": true,
     "instanceId": "c4b20595f230d613d9fcce7c853b7a7e3b4da29f9372a38cfd904a8214fcd864"
   }
 }
